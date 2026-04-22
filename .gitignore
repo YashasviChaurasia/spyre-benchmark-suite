@@ -1,0 +1,22 @@
+# Benchmark results (generated at runtime)
+results/*.json
+results/*.commands
+results/*.log
+!results/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+benchmark.log

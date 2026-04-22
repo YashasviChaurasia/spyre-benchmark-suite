@@ -1,0 +1,109 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: yc-vllm-spyre-benchmark
+  labels:
+    deployer: yc
+    purpose: benchmark
+spec:
+  schedulerName: spyre-scheduler
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: us.icr.io/wxpe-cicd-internal/amd64/vllm-spyre-dev:dev-next
+      imagePullPolicy: Always
+      resources:
+        limits:
+          ibm.com/spyre_pf: '1'
+        requests:
+          ibm.com/spyre_pf: '1'
+      workingDir: /dev/shm
+      env:
+        # ===========================================
+        # USER-CONFIGURABLE: Change these to customize
+        # ===========================================
+
+        # Benchmark suite repo — fork this and point to your fork
+        - name: BENCHMARK_REPO
+          value: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
+        - name: BENCHMARK_BRANCH
+          value: main
+
+        # vLLM + Spyre plugin repo — use a custom fork/branch for testing custom builds
+        - name: SPYRE_INFERENCE_REPO
+          value: https://github.com/torch-spyre/spyre-inference.git
+        - name: SPYRE_INFERENCE_BRANCH
+          value: main
+
+        # ===========================================
+        # SPYRE HARDWARE CONFIG: Do not change unless
+        # adjusting hardware allocation
+        # ===========================================
+        - name: HOME
+          value: /dev/shm
+        - name: HF_HOME
+          value: /dev/shm
+        - name: FLEX_COMPUTE
+          value: SENTIENT
+        - name: FLEX_DEVICE
+          value: PF
+        - name: TOKENIZERS_PARALLELISM
+          value: 'false'
+        - name: AIU_SETUP_MULTI_AIU
+          value: '1'
+      command:
+        - bash
+        - -c
+        - |
+            set -ex
+
+            # ---- Phase 1: Shell environment ----
+            cp /home/senuser/.bashrc ~/
+            cp /home/senuser/.bash_profile ~/
+
+            # ---- Phase 2: Install uv and create venv ----
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.local/bin:$PATH"
+            uv venv .venv --system-site-packages
+            source ./.venv/bin/activate
+
+            # ---- Phase 3: Install vLLM + Spyre plugin ----
+            echo "=== Installing vLLM from ${SPYRE_INFERENCE_REPO} (branch: ${SPYRE_INFERENCE_BRANCH}) ==="
+            git clone -b "${SPYRE_INFERENCE_BRANCH}" "${SPYRE_INFERENCE_REPO}"
+            cd spyre-inference
+            uv sync --frozen --active --inexact
+            cd /dev/shm
+
+            # Verify vLLM is installed
+            python3 -c "import vllm; print('vLLM version:', vllm.__version__)"
+
+            # ---- Phase 4: Install benchmark dependencies ----
+            uv pip install pyyaml
+            # jq is needed by the benchmark runner for JSON→CLI arg conversion
+            apt-get update -qq && apt-get install -y -qq jq 2>/dev/null || true
+
+            # ---- Phase 5: Clone benchmark suite ----
+            echo "=== Cloning benchmark suite from ${BENCHMARK_REPO} (branch: ${BENCHMARK_BRANCH}) ==="
+            git clone -b "${BENCHMARK_BRANCH}" "${BENCHMARK_REPO}" benchmark-suite
+            cd benchmark-suite
+
+            # ---- Phase 6: Run benchmarks ----
+            echo "=== Starting benchmarks ==="
+            bash scripts/run_benchmarks.sh 2>&1 | tee /dev/shm/benchmark.log
+
+            echo "===== BENCHMARK COMPLETE ====="
+      volumeMounts:
+        - name: dev-shm
+          mountPath: /dev/shm
+      terminationMessagePath: /dev/termination-log
+      terminationMessagePolicy: File
+  imagePullSecrets:
+    - name: wxpe-cicd-vllm-iccr-internal
+  serviceAccount: default
+  volumes:
+    - name: dev-shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 64Gi
