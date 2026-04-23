@@ -72,7 +72,7 @@ run_benchmark_tests() {
     echo "  Running ${test_type} benchmarks"
     echo "============================================"
 
-    jq -c '.[]' "$test_file" | while read -r params; do
+    while read -r params; do
         test_name=$(echo "$params" | jq -r '.test_name')
         bench_params=$(echo "$params" | jq -r '.parameters')
         bench_args=$(json2args "$bench_params")
@@ -114,7 +114,7 @@ run_benchmark_tests() {
             echo "FAIL: $test_name (exit code: $?)"
             fail_count=$((fail_count + 1))
         fi
-    done
+    done < <(jq -c '.[]' "$test_file")
 
     echo ""
     echo "${test_type} summary: $pass_count passed, $fail_count failed"
