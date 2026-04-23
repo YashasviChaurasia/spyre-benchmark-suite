@@ -121,6 +121,7 @@ spec:
           mountPath: /dev/shm
       terminationMessagePath: /dev/termination-log
       terminationMessagePolicy: File
+  restartPolicy: Never
   imagePullSecrets:
     - name: wxpe-cicd-vllm-iccr-internal
   serviceAccount: default
