@@ -53,6 +53,8 @@ spec:
           value: 'false'
         - name: AIU_SETUP_MULTI_AIU
           value: '1'
+        - name: SAVE_TO_PYTORCH_BENCHMARK_FORMAT
+          value: '1'
       command:
         - bash
         - -c
