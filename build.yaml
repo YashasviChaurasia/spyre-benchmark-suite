@@ -59,6 +59,10 @@ spec:
         - |
             set -ex
 
+            # ---- Cleanup from previous restarts ----
+            # /dev/shm persists across container restarts within the same pod
+            rm -rf /dev/shm/.venv /dev/shm/spyre-inference /dev/shm/benchmark-suite
+
             # ---- Phase 1: Shell environment ----
             cp /home/senuser/.bashrc ~/
             cp /home/senuser/.bash_profile ~/
@@ -69,20 +73,39 @@ spec:
             uv venv .venv --system-site-packages
             source ./.venv/bin/activate
 
-            # ---- Phase 3: Install vLLM + Spyre plugin ----
+            # ---- Phase 3: Install vLLM 0.19.0 + Spyre plugin from source ----
+            # The base image /opt/vllm has vLLM 0.18.1 which crashes during
+            # Spyre compile_graph warmup. spyre-inference builds vLLM 0.19.0 +
+            # torch-spyre which works correctly on Spyre hardware.
+
+            # Spyre SDK: compiler tools, headers, and libraries for torch-spyre C++ build
+            export PATH="/opt/ibm/spyre/runtime/bin:$PATH"
+            SPYRE_INCLUDES="/opt/ibm/spyre/runtime/include:/opt/ibm/spyre/runtime/include/concurrentqueue/moodycamel:/opt/ibm/spyre/runtime/include/common/include:/opt/ibm/spyre/deeptools/include:/opt/ibm/spyre/senlib/include:/opt/ibm/spyre/senlib/flightlog/include:/opt/ibm/spyre/spyre-comms/include"
+            export C_INCLUDE_PATH="${SPYRE_INCLUDES}:${C_INCLUDE_PATH:-}"
+            export CPLUS_INCLUDE_PATH="${SPYRE_INCLUDES}:${CPLUS_INCLUDE_PATH:-}"
+            export LIBRARY_PATH="/opt/ibm/spyre/runtime/lib:/opt/ibm/spyre/deeptools/lib:/opt/ibm/spyre/senlib/lib:${LIBRARY_PATH:-}"
+
             echo "=== Installing vLLM from ${SPYRE_INFERENCE_REPO} (branch: ${SPYRE_INFERENCE_BRANCH}) ==="
             git clone -b "${SPYRE_INFERENCE_BRANCH}" "${SPYRE_INFERENCE_REPO}"
             cd spyre-inference
-            uv sync --frozen --active --inexact
+
+            # Pre-install build deps that uv sync's isolated sandbox needs
+            uv pip install cmake numpy setuptools-scm wheel ninja expecttest
+            export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_VLLM_SPYRE_NEXT="0.1.0"
+
+            # --no-build-isolation-package: let vllm and torch-spyre use
+            # cmake/ninja/numpy from the venv instead of an isolated sandbox
+            uv sync --frozen --active --inexact \
+              --no-build-isolation-package vllm \
+              --no-build-isolation-package torch-spyre
             cd /dev/shm
 
-            # Verify vLLM is installed
+            # Verify vLLM 0.19.0 is installed
             python3 -c "import vllm; print('vLLM version:', vllm.__version__)"
 
             # ---- Phase 4: Install benchmark dependencies ----
-            uv pip install pyyaml
-            # jq is needed by the benchmark runner for JSON→CLI arg conversion
-            apt-get update -qq && apt-get install -y -qq jq 2>/dev/null || true
+            uv pip install pyyaml 2>/dev/null || pip install pyyaml
+            which jq || (apt-get update -qq && apt-get install -y -qq jq 2>/dev/null) || true
 
             # ---- Phase 5: Clone benchmark suite ----
             echo "=== Cloning benchmark suite from ${BENCHMARK_REPO} (branch: ${BENCHMARK_BRANCH}) ==="
