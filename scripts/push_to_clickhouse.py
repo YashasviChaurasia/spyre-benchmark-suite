@@ -33,6 +33,32 @@ DEVICE = "spyre"
 ARCH = "IBM Spyre"
 
 
+def _parse_json_block(lines):
+    """Parse a JSON object from log lines, handling shell trace artifacts."""
+    cleaned = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("+ "):
+            continue
+        if "+ " in stripped and not stripped.startswith("{") and not stripped.startswith("["):
+            stripped = stripped[:stripped.index("+ ")].rstrip()
+        if stripped:
+            cleaned.append(stripped)
+    if not cleaned:
+        return None
+    raw = "\n".join(cleaned)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        for i in range(len(raw) - 1, 0, -1):
+            if raw[i] in ("}","]"):
+                try:
+                    return json.loads(raw[:i + 1])
+                except json.JSONDecodeError:
+                    continue
+        return None
+
+
 def extract_summary_from_logs(log_text):
     """Extract benchmark_summary.json from pod log output."""
     start_marker = "========== BENCHMARK RESULTS (JSON) =========="
@@ -41,37 +67,53 @@ def extract_summary_from_logs(log_text):
     in_block = False
     json_lines = []
     for line in log_text.split("\n"):
-        stripped = line.strip()
-        if start_marker in stripped:
+        if start_marker in line:
             in_block = True
             continue
-        if end_marker in stripped:
+        if end_marker in line:
             break
         if in_block:
-            # Skip shell trace lines (+ echo, + cat, + [[, etc.)
-            if stripped.startswith("+ "):
+            json_lines.append(line)
+
+    return _parse_json_block(json_lines)
+
+
+def extract_individual_results_from_logs(log_text):
+    """Extract individual result JSONs from the per-file printout in logs.
+
+    Looks for blocks like:
+        --- latency_test_name.json ---
+        { ... json ... }
+        --- next_file.json ---
+    """
+    import re
+    results = {}
+    lines = log_text.split("\n")
+    i = 0
+    while i < len(lines):
+        # Match: --- some_test_name.json ---
+        m = re.match(r'^---\s+(\S+\.json)\s+---', lines[i].strip())
+        if m:
+            filename = m.group(1)
+            # Skip .pytorch.json, -tests.json, benchmark_summary.json
+            if filename.endswith(".pytorch.json") or filename.endswith("-tests.json") or filename == "benchmark_summary.json":
+                i += 1
                 continue
-            # Handle lines like "}+ echo ''" where JSON and shell trace merge
-            if "+ " in stripped and not stripped.startswith("{"):
-                stripped = stripped[:stripped.index("+ ")].rstrip()
-            if stripped:
-                json_lines.append(stripped)
-
-    if not json_lines:
-        return None
-
-    raw = "\n".join(json_lines)
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        # Try trimming trailing garbage
-        for i in range(len(raw) - 1, 0, -1):
-            if raw[i] == "}":
-                try:
-                    return json.loads(raw[:i + 1])
-                except json.JSONDecodeError:
-                    continue
-        return None
+            test_name = filename.replace(".json", "")
+            json_lines = []
+            i += 1
+            while i < len(lines):
+                l = lines[i].strip()
+                if l.startswith("---") or l.startswith("===="):
+                    break
+                json_lines.append(lines[i])
+                i += 1
+            parsed = _parse_json_block(json_lines)
+            if parsed:
+                results[test_name] = parsed
+        else:
+            i += 1
+    return results
 
 
 def summary_to_clickhouse_rows(summary, head_sha=None, head_branch="main",
@@ -250,9 +292,30 @@ def main():
     if args.from_logs:
         log_text = sys.stdin.read()
         summary = extract_summary_from_logs(log_text)
-        if not summary:
-            print("ERROR: Could not extract benchmark_summary.json from logs")
-            sys.exit(1)
+        if not summary or summary.get("total_tests", 0) == 0:
+            # Fallback: build summary from individual result JSONs in logs
+            print("Summary empty, extracting individual results from logs...")
+            individual = extract_individual_results_from_logs(log_text)
+            if individual:
+                ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                results = []
+                for test_name, data in individual.items():
+                    if test_name.startswith("latency_"):
+                        r = {"test_name": test_name, "type": "latency"}
+                        r["avg_latency_s"] = data.get("avg_latency")
+                        pcts = data.get("percentiles", {})
+                        r["p50_latency_s"] = pcts.get("50")
+                        r["p99_latency_s"] = pcts.get("99")
+                        results.append(r)
+                    elif test_name.startswith("throughput_"):
+                        r = {"test_name": test_name, "type": "throughput"}
+                        r["tokens_per_second"] = data.get("tokens_per_second")
+                        r["requests_per_second"] = data.get("requests_per_second")
+                        results.append(r)
+                summary = {"timestamp": ts, "device": "IBM_Spyre_PF", "total_tests": len(results), "results": results}
+            else:
+                print("ERROR: No results found in logs")
+                sys.exit(1)
     elif args.summary_file:
         with open(args.summary_file) as f:
             summary = json.load(f)
