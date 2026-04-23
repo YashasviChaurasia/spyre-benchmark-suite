@@ -5,13 +5,13 @@
 engine:
   enforce_eager: true          # avoid torch.compile overhead; set false for compiled-mode benchmarks
   dtype: float16
-  max_model_len: 2048          # conservative for 1 Spyre PF card; increase with more cards
-  max_num_seqs: 4              # max concurrent sequences; must match Spyre warmup batch sizes
+  max_model_len: 3072          # matches Spyre TP=1 config from model_configs.yaml
+  max_num_seqs: 16             # matches Spyre TP=1 config from model_configs.yaml
   load_format: dummy           # "dummy" = random weights (no download); "auto" = real weights (needs HF access)
 
 # Models to benchmark
 models:
-  - name: meta-llama/Meta-Llama-3-8B
+  - name: ibm-granite/granite-3.3-8b-instruct
     tensor_parallel_size: 1    # must match ibm.com/spyre_pf count in build.yaml
 
 # Benchmark workloads
