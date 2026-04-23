@@ -33,9 +33,9 @@ spec:
 
         # vLLM + Spyre plugin repo — use a custom fork/branch for testing custom builds
         - name: SPYRE_INFERENCE_REPO
-          value: https://github.com/torch-spyre/spyre-inference.git
+          value: https://github.com/YashasviChaurasia/spyre-inference.git
         - name: SPYRE_INFERENCE_BRANCH
-          value: main
+          value: remove-scm-root
 
         # ===========================================
         # SPYRE HARDWARE CONFIG: Do not change unless
@@ -91,7 +91,6 @@ spec:
 
             # Pre-install build deps that uv sync's isolated sandbox needs
             uv pip install cmake numpy setuptools-scm wheel ninja expecttest
-            export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_VLLM_SPYRE_NEXT="0.1.0"
 
             # --no-build-isolation-package: let vllm and torch-spyre use
             # cmake/ninja/numpy from the venv instead of an isolated sandbox
