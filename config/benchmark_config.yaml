@@ -1,48 +1,32 @@
 # Spyre vLLM Benchmark Configuration
-# Edit this file in your fork to customize benchmarks.
+# Minimal validation config — 1 latency + 1 throughput (~5-10 min total)
 
 # vLLM engine settings for Spyre
 engine:
-  enforce_eager: true          # avoid torch.compile overhead; set false for compiled-mode benchmarks
+  enforce_eager: true
   dtype: float16
-  max_model_len: 3072          # matches Spyre TP=1 config from model_configs.yaml
-  max_num_seqs: 16             # matches Spyre TP=1 config from model_configs.yaml
-  load_format: dummy           # "dummy" = random weights (no download); "auto" = real weights (needs HF access)
+  max_model_len: 3072
+  max_num_seqs: 16
+  load_format: dummy
 
 # Models to benchmark
 models:
   - name: ibm-granite/granite-3.3-8b-instruct
-    tensor_parallel_size: 1    # must match ibm.com/spyre_pf count in build.yaml
+    tensor_parallel_size: 1
 
-# Benchmark workloads
+# Benchmark workloads (minimal for validation)
 workloads:
   latency:
     - input_len: 128
       output_len: 128
       batch_size: 1
-      num_iters_warmup: 3
-      num_iters: 10
-    - input_len: 256
-      output_len: 256
-      batch_size: 1
-      num_iters_warmup: 3
-      num_iters: 10
-    - input_len: 512
-      output_len: 128
-      batch_size: 4
-      num_iters_warmup: 3
-      num_iters: 10
+      num_iters_warmup: 1
+      num_iters: 3
 
   throughput:
     - input_len: 128
       output_len: 128
-      num_prompts: 50
-    - input_len: 256
-      output_len: 256
-      num_prompts: 50
-    - input_len: 512
-      output_len: 128
-      num_prompts: 100
+      num_prompts: 10
 
 # Metadata (attached to results)
 metadata:
