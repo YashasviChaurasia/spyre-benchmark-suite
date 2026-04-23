@@ -3,7 +3,6 @@
 
 # vLLM engine settings for Spyre
 engine:
-  enforce_eager: true
   dtype: float16
   max_model_len: 3072
   max_num_seqs: 16
@@ -23,10 +22,7 @@ workloads:
       num_iters_warmup: 1
       num_iters: 3
 
-  throughput:
-    - input_len: 128
-      output_len: 128
-      num_prompts: 10
+  throughput: []
 
 # Metadata (attached to results)
 metadata:

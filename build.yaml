@@ -1,7 +1,7 @@
 kind: Pod
 apiVersion: v1
 metadata:
-  name: yc-vllm-spyre-benchmark-2
+  name: yc-vllm-spyre-benchmark-4
   labels:
     deployer: yc
     purpose: benchmark
