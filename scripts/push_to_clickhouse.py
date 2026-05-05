@@ -206,11 +206,21 @@ def push_to_clickhouse(jsonl_data, clickhouse_url=CLICKHOUSE_URL):
         tmp.write(jsonl_data)
         tmp_path = tmp.name
 
+    user = os.environ.get("CLICKHOUSE_USER", "")
+    password = os.environ.get("CLICKHOUSE_PASSWORD", "")
+    auth_args = ["-u", f"{user}:{password}"] if user else []
+
+    tls_args = []
+    if clickhouse_url.startswith("https"):
+        ca_cert = os.environ.get("CLICKHOUSE_CA_CERT", "")
+        tls_args = ["--cacert", ca_cert] if ca_cert else ["-k"]
+
     result = subprocess.run(
         ["curl", "-s", "-w", "%{http_code}",
          "-X", "POST",
          f"{clickhouse_url}/?query=INSERT+INTO+benchmark.oss_ci_benchmark_v3+FORMAT+JSONEachRow",
-         "--data-binary", f"@{tmp_path}"],
+         "--data-binary", f"@{tmp_path}"]
+        + auth_args + tls_args,
         capture_output=True, text=True,
     )
     os.unlink(tmp_path)

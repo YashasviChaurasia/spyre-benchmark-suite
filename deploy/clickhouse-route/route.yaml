@@ -1,0 +1,19 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: clickhouse-ingest
+  namespace: spyre-cdev
+  labels:
+    app: clickhouse
+    purpose: benchmark-ingest
+spec:
+  host: clickhouse-ingest-spyre-cdev.apps.fmaas-devstage-backend.fmaas.res.ibm.com
+  to:
+    kind: Service
+    name: clickhouse
+    weight: 100
+  port:
+    targetPort: 8123
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

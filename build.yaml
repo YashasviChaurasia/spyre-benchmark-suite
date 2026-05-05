@@ -1,7 +1,7 @@
 kind: Pod
 apiVersion: v1
 metadata:
-  name: yc-vllm-spyre-benchmark
+  name: yc-vllm-spyre-benchmark-v2
   labels:
     deployer: yc
     purpose: benchmark
@@ -33,9 +33,10 @@ spec:
 
         # vLLM + Spyre plugin repo — use a custom fork/branch for testing custom builds
         - name: SPYRE_INFERENCE_REPO
-          value: https://github.com/YashasviChaurasia/spyre-inference.git
+          value: https://github.com/torch-spyre/spyre-inference.git
         - name: SPYRE_INFERENCE_BRANCH
-          value: remove-scm-root
+          value: main
+          # value: remove-scm-root
 
         # ===========================================
         # SPYRE HARDWARE CONFIG: Do not change unless
