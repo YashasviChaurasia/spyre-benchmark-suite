@@ -55,7 +55,7 @@ workloads:
 ### Step 2: Deploy Benchmark Pod
 
 ```bash
-oc login --token=<token> --server=https://api.torch-cicd.spyre.res.ibm.com:6443
+oc login --server=<benchmark-cluster-api-url>
 oc delete pod yc-vllm-spyre-benchmark-v2 -n torch-spyre-cicd 2>/dev/null
 oc apply -f build.yaml -n torch-spyre-cicd
 ```
@@ -71,7 +71,7 @@ oc logs -f yc-vllm-spyre-benchmark-v2 -n torch-spyre-cicd
 Run the watcher — it polls for completed pods and pushes to ClickHouse:
 
 ```bash
-export CLICKHOUSE_URL="https://clickhouse-ingest-spyre-cdev.apps.fmaas-devstage-backend.fmaas.res.ibm.com"
+export CLICKHOUSE_URL="<clickhouse-route-url>"
 export CLICKHOUSE_USER="default"
 export CLICKHOUSE_PASSWORD="<password>"
 
@@ -85,7 +85,7 @@ nohup bash scripts/watcher.sh >> watcher.log 2>&1 &
 
 ### Step 5: View on Dashboard
 
-Open: https://vllm-dashboard-spyre-cdev.apps.fmaas-devstage-backend.fmaas.res.ibm.com/benchmark/v3/dashboard/vllm_benchmark
+Open: https://vllm-dashboard-spyre-cdev.apps.fmaas-devstage-backend.fmaas.res.ibm.com/benchmark/v3/dashboard/spyre_e2e_benchmark
 
 ---
 
@@ -112,60 +112,6 @@ spyre-benchmark-suite/
 
 ---
 
-## Dashboard Setup Guide
-
-The dashboard runs on the **dashboard cluster** (`api.fmaas-devstage-backend.fmaas.res.ibm.com:6443`) in namespace `spyre-cdev`. It consists of:
-
-1. **ClickHouse** — stores benchmark metrics
-2. **torchci (Next.js)** — web UI that reads from ClickHouse
-3. **ClickHouse Route** — public HTTPS endpoint for external data ingestion
-
-### First-Time Dashboard Deployment
-
-The dashboard manifests live in the `replicate-pytorch-hud` repo under `deploy/openshift/`. Apply them in order:
-
-```bash
-oc login --server=https://api.fmaas-devstage-backend.fmaas.res.ibm.com:6443
-
-# 1. Image streams
-oc apply -f deploy/openshift/00-imagestreams.yaml -n spyre-cdev
-
-# 2. ClickHouse (PVC + config + deployment + service)
-oc apply -f deploy/openshift/01-clickhouse-pvc.yaml -n spyre-cdev
-oc apply -f deploy/openshift/02-clickhouse-deployment.yaml -n spyre-cdev
-oc apply -f deploy/openshift/02a-clickhouse-config.yaml -n spyre-cdev
-oc apply -f deploy/openshift/03-clickhouse-service.yaml -n spyre-cdev
-
-# 3. ClickHouse public route (for external push)
-oc apply -f deploy/openshift/03a-clickhouse-route.yaml -n spyre-cdev
-
-# 4. Dashboard UI (secret + configmap + deployment + service + route)
-oc apply -f deploy/openshift/04-torchci-secret.yaml -n spyre-cdev
-oc apply -f deploy/openshift/05-torchci-configmap.yaml -n spyre-cdev
-oc apply -f deploy/openshift/06-torchci-deployment.yaml -n spyre-cdev
-oc apply -f deploy/openshift/07-torchci-service.yaml -n spyre-cdev
-oc apply -f deploy/openshift/08-torchci-route.yaml -n spyre-cdev
-```
-
-### ClickHouse Auth
-
-ClickHouse is protected with a password. The password is configured in `02a-clickhouse-config.yaml` (as plaintext in the XML) and must also be set in:
-- `torchci-secrets` → `CLICKHOUSE_HUD_USER_PASSWORD` (for the dashboard to read)
-- `CLICKHOUSE_PASSWORD` env var (for the watcher to push)
-
-### Verify ClickHouse is Accessible
-
-```bash
-# Ping (no auth needed)
-curl -sk https://clickhouse-ingest-spyre-cdev.apps.fmaas-devstage-backend.fmaas.res.ibm.com/ping
-
-# Query (needs auth)
-curl -sk -u "default:<password>" \
-  "https://clickhouse-ingest-spyre-cdev.apps.fmaas-devstage-backend.fmaas.res.ibm.com/?query=SELECT+count()+FROM+benchmark.oss_ci_benchmark_v3"
-```
-
----
-
 ## Watcher Guide
 
 The watcher (`scripts/watcher.sh`) is a local background process that:
@@ -178,12 +124,12 @@ The watcher (`scripts/watcher.sh`) is a local background process that:
 
 ```bash
 # Required environment variables
-export CLICKHOUSE_URL="https://clickhouse-ingest-spyre-cdev.apps.fmaas-devstage-backend.fmaas.res.ibm.com"
+export CLICKHOUSE_URL="<clickhouse-route-url>"
 export CLICKHOUSE_USER="default"
 export CLICKHOUSE_PASSWORD="<password>"
 
 # Login to the benchmark cluster
-oc login --server=https://api.torch-cicd.spyre.res.ibm.com:6443
+oc login --server=<benchmark-cluster-api-url>
 ```
 
 ### Run
@@ -293,17 +239,6 @@ oc apply -f build.yaml -n torch-spyre-cicd
 
 ---
 
-## Clusters
-
-| Cluster | Server | Namespace | Purpose |
-|---------|--------|-----------|---------|
-| Benchmark | `api.torch-cicd.spyre.res.ibm.com:6443` | `torch-spyre-cicd` | Run benchmarks on Spyre PF cards |
-| Dashboard | `api.fmaas-devstage-backend.fmaas.res.ibm.com:6443` | `spyre-cdev` | ClickHouse + dashboard UI |
-
-**Note:** These clusters are network-isolated. The watcher bridges them by running on a machine that can reach both.
-
----
-
 ## Troubleshooting
 
 | Problem | Check |
@@ -312,8 +247,8 @@ oc apply -f build.yaml -n torch-spyre-cicd
 | Pod exits immediately | `oc logs ...` — check for git clone / uv sync errors |
 | Tests fail but pod completes | Look for `FAIL:` in logs — reduce `max_model_len` or `batch_size` |
 | Watcher not pushing | Check `oc whoami` (logged in?), check `CLICKHOUSE_URL` is set |
-| ClickHouse auth error | Verify password matches `02a-clickhouse-config.yaml` |
-| Dashboard not showing data | Check `benchmark.name` is `vllm_benchmark` and data exists in ClickHouse |
+| ClickHouse auth error | Verify `CLICKHOUSE_PASSWORD` env var is correct |
+| Dashboard not showing data | Check `benchmark.name` is `spyre_e2e_benchmark` and metadata rows exist |
 | Duplicate pushes | Pod should have annotation `benchmark-watcher/pushed=true` |
 
 ---
