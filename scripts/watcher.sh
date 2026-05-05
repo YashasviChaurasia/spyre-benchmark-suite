@@ -25,7 +25,7 @@ NAMESPACE="${NAMESPACE:-torch-spyre-cicd}"
 LABEL_SELECTOR="purpose=benchmark"
 ANNOTATION_KEY="benchmark-watcher/pushed"
 CONTAINER_NAME="${CONTAINER_NAME:-app}"
-BENCHMARK_NAME="${BENCHMARK_NAME:-vllm_benchmark}"
+BENCHMARK_NAME="${BENCHMARK_NAME:-spyre_e2e_benchmark}"
 POLL_INTERVAL="${POLL_INTERVAL:-60}"
 
 # Verify requirements

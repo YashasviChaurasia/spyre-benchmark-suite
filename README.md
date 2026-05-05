@@ -207,7 +207,7 @@ tail -f watcher.log
 | `CLICKHOUSE_USER` | (required) | ClickHouse username |
 | `CLICKHOUSE_PASSWORD` | (required) | ClickHouse password |
 | `NAMESPACE` | `torch-spyre-cicd` | Namespace to watch for pods |
-| `BENCHMARK_NAME` | `vllm_benchmark` | Benchmark name in ClickHouse |
+| `BENCHMARK_NAME` | `spyre_e2e_benchmark` | Benchmark name in ClickHouse (must match dashboard config) |
 | `POLL_INTERVAL` | `60` | Seconds between polls |
 | `CONTAINER_NAME` | `app` | Container name to read logs from |
 
@@ -226,7 +226,7 @@ tail -f watcher.log
 oc logs yc-vllm-spyre-benchmark-v2 -n torch-spyre-cicd | \
   python3 scripts/push_to_clickhouse.py --from-logs \
     --clickhouse-url "$CLICKHOUSE_URL" \
-    --benchmark-name vllm_benchmark
+    --benchmark-name spyre_e2e_benchmark
 ```
 
 ### Clean Up Test Data
@@ -235,7 +235,7 @@ oc logs yc-vllm-spyre-benchmark-v2 -n torch-spyre-cicd | \
 python3 scripts/push_to_clickhouse.py --delete \
   --workflow-id <ID> \
   --clickhouse-url "$CLICKHOUSE_URL" \
-  --benchmark-name vllm_benchmark
+  --benchmark-name spyre_e2e_benchmark
 ```
 
 ---
