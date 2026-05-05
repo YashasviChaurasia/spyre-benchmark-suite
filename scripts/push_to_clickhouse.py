@@ -199,8 +199,8 @@ def summary_to_clickhouse_rows(summary, head_sha=None, head_branch="main",
     return rows
 
 
-def push_to_clickhouse(jsonl_data, clickhouse_url=CLICKHOUSE_URL):
-    """Push JSONL data to ClickHouse via HTTP API."""
+def _clickhouse_insert(table, jsonl_data, clickhouse_url=CLICKHOUSE_URL):
+    """Insert JSONL data into a ClickHouse table via HTTP API."""
     import tempfile
     with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as tmp:
         tmp.write(jsonl_data)
@@ -218,7 +218,7 @@ def push_to_clickhouse(jsonl_data, clickhouse_url=CLICKHOUSE_URL):
     result = subprocess.run(
         ["curl", "-s", "-w", "%{http_code}",
          "-X", "POST",
-         f"{clickhouse_url}/?query=INSERT+INTO+benchmark.oss_ci_benchmark_v3+FORMAT+JSONEachRow",
+         f"{clickhouse_url}/?query=INSERT+INTO+{table}+FORMAT+JSONEachRow",
          "--data-binary", f"@{tmp_path}"]
         + auth_args + tls_args,
         capture_output=True, text=True,
@@ -227,9 +227,37 @@ def push_to_clickhouse(jsonl_data, clickhouse_url=CLICKHOUSE_URL):
     http_code = result.stdout.strip()[-3:]
     body = result.stdout.strip()[:-3]
     if http_code != "200":
-        print(f"ERROR: ClickHouse INSERT failed (HTTP {http_code}): {body}")
+        print(f"ERROR: ClickHouse INSERT into {table} failed (HTTP {http_code}): {body}")
         return False
     return True
+
+
+def push_to_clickhouse(jsonl_data, clickhouse_url=CLICKHOUSE_URL):
+    """Push JSONL data to ClickHouse via HTTP API."""
+    return _clickhouse_insert("benchmark.oss_ci_benchmark_v3", jsonl_data, clickhouse_url)
+
+
+def push_metadata(rows, clickhouse_url=CLICKHOUSE_URL):
+    """Push metadata rows so the dashboard can discover commits/workflows."""
+    metadata_rows = []
+    for row in rows:
+        metadata_rows.append({
+            "timestamp": row["timestamp"],
+            "repo": row["repo"],
+            "head_branch": row["head_branch"],
+            "head_sha": row["head_sha"],
+            "workflow_id": row["workflow_id"],
+            "benchmark_name": row["benchmark"]["name"],
+            "model_name": row["model"]["name"],
+            "model_backend": "",
+            "metric_name": row["metric"]["name"],
+            "benchmark_dtype": "",
+            "benchmark_mode": "",
+            "device": row["benchmark"]["extra_info"].get("device", ""),
+            "arch": row["benchmark"]["extra_info"].get("arch", ""),
+        })
+    jsonl = "\n".join(json.dumps(r) for r in metadata_rows)
+    return _clickhouse_insert("benchmark.oss_ci_benchmark_metadata", jsonl, clickhouse_url)
 
 
 def delete_from_clickhouse(workflow_id=None, benchmark_name=None,
@@ -359,14 +387,20 @@ def main():
         print(f"\nTo delete later: python3 {sys.argv[0]} --delete --workflow-id {wf_id}")
         return
 
-    # Push
+    # Push data + metadata
     print(f"Pushing to {args.clickhouse_url}...")
     if push_to_clickhouse(jsonl, args.clickhouse_url):
-        print(f"SUCCESS: {len(rows)} rows inserted")
-        print(f"Dashboard: /benchmark/v3/dashboard/{args.benchmark_name}")
-        print(f"To delete: python3 {sys.argv[0]} --delete --workflow-id {wf_id}")
+        print(f"SUCCESS: {len(rows)} rows inserted into oss_ci_benchmark_v3")
     else:
         sys.exit(1)
+
+    if push_metadata(rows, args.clickhouse_url):
+        print(f"SUCCESS: {len(rows)} metadata rows inserted")
+    else:
+        print("WARNING: Metadata insert failed (dashboard may not show new commit)")
+
+    print(f"Dashboard: /benchmark/v3/dashboard/{args.benchmark_name}")
+    print(f"To delete: python3 {sys.argv[0]} --delete --workflow-id {wf_id}")
 
 
 if __name__ == "__main__":
