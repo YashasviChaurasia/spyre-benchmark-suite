@@ -14,7 +14,8 @@ engine:
 
 # Models to benchmark
 models:
-  # - name: ibm-granite/granite-3.3-8b-instruct
+  - name: ibm-granite/granite-3.3-8b-instruct
+    tensor_parallel_size: 1
   - name: ibm-ai-platform/micro-g3.3-8b-instruct-1b
     tensor_parallel_size: 1
 

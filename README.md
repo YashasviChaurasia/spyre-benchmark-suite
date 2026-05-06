@@ -7,8 +7,8 @@ Config-driven vLLM benchmarking on IBM Spyre accelerators via OpenShift, with au
 ## Quick Start
 
 ```bash
-# 1. Clone
-git clone https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
+# 1. Fork this repo on GitHub, then clone your fork
+git clone https://github.com/<your-username>/spyre-benchmark-suite.git
 cd spyre-benchmark-suite
 
 # 2. One-time setup: create .env with credentials
@@ -18,12 +18,20 @@ vim .env    # fill in CLICKHOUSE_PASSWORD
 # 3. Configure what to benchmark
 vim config/benchmark_config.yaml
 
-# 4. Login and run
+# 4. Update deployment.benchmark_repo in config to point to YOUR fork
+#    (the pod clones from this URL at runtime)
+
+# 5. Push your config changes
+git add -A && git commit -m "configure benchmarks" && git push
+
+# 6. Login and run
 oc login --server=<benchmark-cluster-api-url>
 bash run.sh
 ```
 
 That's it. `run.sh` deploys the benchmark pod, waits for completion, and pushes results to the dashboard automatically.
+
+> **Important:** The benchmark pod clones config from your **remote repo** (the `benchmark_repo` + `benchmark_branch` in config). You must **push changes before running** — local-only edits won't be picked up by the pod.
 
 ---
 
@@ -80,7 +88,7 @@ spyre-benchmark-suite/
 
 ### `config/benchmark_config.yaml`
 
-This single file controls everything:
+This single file controls everything. Edit it in your fork, push, then run.
 
 ```yaml
 # What to benchmark
@@ -88,10 +96,12 @@ engine:
   dtype: float16
   max_model_len: 3072
   max_num_seqs: 16
-  load_format: dummy              # "dummy" or "auto"
+  load_format: auto               # "auto" = real HF weights, "dummy" = random weights
 
 models:
   - name: ibm-granite/granite-3.3-8b-instruct
+    tensor_parallel_size: 1
+  - name: ibm-ai-platform/micro-g3.3-8b-instruct-1b
     tensor_parallel_size: 1
 
 workloads:
@@ -108,11 +118,11 @@ workloads:
 
 # Deployment settings
 deployment:
-  pod_name: yc-vllm-spyre-benchmark
+  pod_name: yc-vllm-spyre-benchmark       # change to avoid conflicts with others
   namespace: torch-spyre-cicd
   spyre_pf_cards: 1
-  benchmark_repo: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
-  benchmark_branch: main
+  benchmark_repo: https://github.com/<your-username>/spyre-benchmark-suite.git  # YOUR fork
+  benchmark_branch: main                   # branch with your config changes
   spyre_inference_repo: https://github.com/torch-spyre/spyre-inference.git
   spyre_inference_branch: main
 
@@ -122,6 +132,17 @@ dashboard:
   auto_push: true
   timeout: 3600
 ```
+
+### How the pod picks up your config
+
+The pod **clones your fork** at runtime using `deployment.benchmark_repo` + `deployment.benchmark_branch`. This means:
+
+1. You edit `config/benchmark_config.yaml` locally
+2. You **push to your fork** (`git push`)
+3. You run `bash run.sh`
+4. The pod clones your pushed config and runs those benchmarks
+
+If you don't push, the pod uses whatever is on the remote branch — not your local changes.
 
 ### `.env` (secrets — gitignored)
 
@@ -177,18 +198,15 @@ This polls every 60s for completed benchmark pods and pushes their results autom
 
 ## Re-running Benchmarks
 
-Just run again — the script handles cleanup:
-
-```bash
-bash run.sh
-```
-
-Or change config and re-run:
+Change config, push, run:
 
 ```bash
 vim config/benchmark_config.yaml   # change models/workloads
+git add -A && git commit -m "update config" && git push
 bash run.sh
 ```
+
+The script deletes the old pod and deploys fresh each time.
 
 ---
 
