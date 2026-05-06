@@ -29,6 +29,12 @@ spec:
           value: {{SPYRE_INFERENCE_REPO}}
         - name: SPYRE_INFERENCE_BRANCH
           value: {{SPYRE_INFERENCE_BRANCH}}
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-token
+              key: token
+              optional: true
         - name: HOME
           value: /dev/shm
         - name: HF_HOME
