@@ -153,7 +153,7 @@ main() {
     # Step 4: Collect and summarize results
     echo ""
     echo "=== Collecting results ==="
-    python3 "$SCRIPT_DIR/collect_results.py" "$RESULTS_DIR" "$TIMESTAMP"
+    python3 "$SCRIPT_DIR/collect_results.py" "$RESULTS_DIR" "$TIMESTAMP" || echo "WARNING: collect_results.py failed (results still available as individual JSONs)"
 
     # Step 5: Print results to stdout for log capture
     echo ""
