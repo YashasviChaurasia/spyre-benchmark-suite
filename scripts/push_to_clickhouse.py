@@ -268,10 +268,15 @@ def delete_from_clickhouse(workflow_id=None, benchmark_name=None,
         print("ERROR: Specify --workflow-id or --benchmark-name")
         return False
 
+    user = os.environ.get("CLICKHOUSE_USER", "")
+    password = os.environ.get("CLICKHOUSE_PASSWORD", "")
+    auth_args = ["-u", f"{user}:{password}"] if user else []
+    tls_args = ["-k"] if clickhouse_url.startswith("https") else []
+
     # Show what would be deleted
     count_cmd = f"SELECT count(*) FROM benchmark.oss_ci_benchmark_v3 WHERE {where}"
     result = subprocess.run(
-        ["curl", "-sf", f"{clickhouse_url}/", "-d", count_cmd],
+        ["curl", "-sf", f"{clickhouse_url}/", "-d", count_cmd] + auth_args + tls_args,
         capture_output=True, text=True,
     )
     count = result.stdout.strip()
@@ -284,12 +289,14 @@ def delete_from_clickhouse(workflow_id=None, benchmark_name=None,
     # Delete
     subprocess.run(
         ["curl", "-sf", f"{clickhouse_url}/", "-d",
-         f"ALTER TABLE benchmark.oss_ci_benchmark_v3 DELETE WHERE {where}"],
+         f"ALTER TABLE benchmark.oss_ci_benchmark_v3 DELETE WHERE {where}"]
+        + auth_args + tls_args,
         capture_output=True,
     )
     subprocess.run(
         ["curl", "-sf", f"{clickhouse_url}/", "-d",
-         f"ALTER TABLE benchmark.oss_ci_benchmark_metadata DELETE WHERE {meta_where}"],
+         f"ALTER TABLE benchmark.oss_ci_benchmark_metadata DELETE WHERE {meta_where}"]
+        + auth_args + tls_args,
         capture_output=True,
     )
     print(f"Deleted {count} rows. (async — may take a few seconds)")
