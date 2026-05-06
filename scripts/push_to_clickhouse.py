@@ -85,9 +85,12 @@ def extract_individual_results_from_logs(log_text):
         --- latency_test_name.json ---
         { ... json ... }
         --- next_file.json ---
+
+    Also extracts model names from .pytorch.json files.
     """
     import re
     results = {}
+    model_names = {}  # test_name -> model name from pytorch json
     lines = log_text.split("\n")
     i = 0
     while i < len(lines):
@@ -95,11 +98,10 @@ def extract_individual_results_from_logs(log_text):
         m = re.match(r'^---\s+(\S+\.json)\s+---', lines[i].strip())
         if m:
             filename = m.group(1)
-            # Skip .pytorch.json, -tests.json, benchmark_summary.json
-            if filename.endswith(".pytorch.json") or filename.endswith("-tests.json") or filename == "benchmark_summary.json":
+            # Skip -tests.json, benchmark_summary.json
+            if filename.endswith("-tests.json") or filename == "benchmark_summary.json":
                 i += 1
                 continue
-            test_name = filename.replace(".json", "")
             json_lines = []
             i += 1
             while i < len(lines):
@@ -109,10 +111,30 @@ def extract_individual_results_from_logs(log_text):
                 json_lines.append(lines[i])
                 i += 1
             parsed = _parse_json_block(json_lines)
-            if parsed:
-                results[test_name] = parsed
+
+            if filename.endswith(".pytorch.json"):
+                # Extract model name from pytorch format
+                test_name = filename.replace(".pytorch.json", "")
+                if parsed:
+                    # pytorch format is a list of dicts
+                    data = parsed if isinstance(parsed, list) else [parsed]
+                    for item in data:
+                        model = item.get("model", {})
+                        if isinstance(model, dict) and model.get("name"):
+                            model_names[test_name] = model["name"]
+                            break
+            else:
+                test_name = filename.replace(".json", "")
+                if parsed:
+                    results[test_name] = parsed
         else:
             i += 1
+
+    # Attach model names from pytorch JSONs to the results
+    for test_name, data in results.items():
+        if test_name in model_names:
+            data["model"] = model_names[test_name]
+
     return results
 
 
