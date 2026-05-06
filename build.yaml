@@ -29,6 +29,12 @@ spec:
           value: https://github.com/torch-spyre/spyre-inference.git
         - name: SPYRE_INFERENCE_BRANCH
           value: main
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-token
+              key: token
+              optional: true
         - name: HOME
           value: /dev/shm
         - name: HF_HOME

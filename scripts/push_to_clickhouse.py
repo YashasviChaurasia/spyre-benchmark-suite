@@ -137,14 +137,9 @@ def summary_to_clickhouse_rows(summary, head_sha=None, head_branch="main",
     for result in summary.get("results", []):
         test_name = result.get("test_name", "")
         test_type = result.get("type", "")
-        model_name = "unknown"
 
-        # Extract model from test name
-        # e.g. latency_ibm_granite_granite_3.3_8b_instruct_in128_out128_bs1
-        if "ibm_granite" in test_name:
-            model_name = "ibm-granite/granite-3.3-8b-instruct"
-        elif "meta_llama" in test_name:
-            model_name = "meta-llama/Meta-Llama-3-8B"
+        # Use model field from result if available (extracted from vllm bench JSON)
+        model_name = result.get("model", "unknown")
 
         base_extra_info = {
             "device": DEVICE,
@@ -344,11 +339,15 @@ def main():
                         pcts = data.get("percentiles", {})
                         r["p50_latency_s"] = pcts.get("50")
                         r["p99_latency_s"] = pcts.get("99")
+                        if data.get("model"):
+                            r["model"] = data["model"]
                         results.append(r)
                     elif test_name.startswith("throughput_"):
                         r = {"test_name": test_name, "type": "throughput"}
                         r["tokens_per_second"] = data.get("tokens_per_second")
                         r["requests_per_second"] = data.get("requests_per_second")
+                        if data.get("model"):
+                            r["model"] = data["model"]
                         results.append(r)
                 summary = {"timestamp": ts, "device": "IBM_Spyre_PF", "total_tests": len(results), "results": results}
             else:
