@@ -52,7 +52,7 @@ deployment:
   benchmark_repo: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
   benchmark_branch: test/pinned-spyre-build
   spyre_inference_repo: https://github.com/torch-spyre/spyre-inference.git
-  spyre_inference_branch: v0.19.0
+  spyre_inference_branch: main
 
 # ===================================================
 # DASHBOARD SETTINGS
