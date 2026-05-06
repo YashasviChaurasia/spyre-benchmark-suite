@@ -1,7 +1,7 @@
 kind: Pod
 apiVersion: v1
 metadata:
-  name: yc-vllm-spyre-benchmark
+  name: {{POD_NAME}}
   labels:
     deployer: yc
     purpose: benchmark
@@ -16,19 +16,19 @@ spec:
       imagePullPolicy: Always
       resources:
         limits:
-          ibm.com/spyre_pf: '1'
+          ibm.com/spyre_pf: '{{SPYRE_PF_CARDS}}'
         requests:
-          ibm.com/spyre_pf: '1'
+          ibm.com/spyre_pf: '{{SPYRE_PF_CARDS}}'
       workingDir: /dev/shm
       env:
         - name: BENCHMARK_REPO
-          value: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
+          value: {{BENCHMARK_REPO}}
         - name: BENCHMARK_BRANCH
-          value: main
+          value: {{BENCHMARK_BRANCH}}
         - name: SPYRE_INFERENCE_REPO
-          value: https://github.com/torch-spyre/spyre-inference.git
+          value: {{SPYRE_INFERENCE_REPO}}
         - name: SPYRE_INFERENCE_BRANCH
-          value: main
+          value: {{SPYRE_INFERENCE_BRANCH}}
         - name: HOME
           value: /dev/shm
         - name: HF_HOME

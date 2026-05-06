@@ -4,36 +4,91 @@ Config-driven vLLM benchmarking on IBM Spyre accelerators via OpenShift, with au
 
 ---
 
-## End-to-End Workflow
+## Quick Start
+
+```bash
+# 1. Clone
+git clone https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
+cd spyre-benchmark-suite
+
+# 2. One-time setup: create .env with credentials
+cp .env.example .env
+vim .env    # fill in CLICKHOUSE_PASSWORD
+
+# 3. Configure what to benchmark
+vim config/benchmark_config.yaml
+
+# 4. Login and run
+oc login --server=<benchmark-cluster-api-url>
+bash run.sh
+```
+
+That's it. `run.sh` deploys the benchmark pod, waits for completion, and pushes results to the dashboard automatically.
+
+---
+
+## How `run.sh` Works
 
 ```
-1. Edit config/benchmark_config.yaml (what to benchmark)
-2. oc apply -f build.yaml                 (deploy benchmark pod)
-3. Pod runs benchmarks → exits Completed
-4. Watcher detects completion → pushes results to ClickHouse
-5. Dashboard auto-displays new data
+bash run.sh
+ ├─ 1. Reads config/benchmark_config.yaml
+ ├─ 2. Renders build.yaml from template (build.yaml.tpl)
+ ├─ 3. Deploys the benchmark pod to OpenShift
+ ├─ 4. Waits for pod to complete (configurable timeout)
+ ├─ 5. Extracts results from pod logs
+ ├─ 6. Pushes metrics to ClickHouse (dashboard DB)
+ ├─ 7. Annotates pod as processed
+ └─ 8. Prints summary + dashboard link
+```
+
+### Options
+
+```bash
+bash run.sh                  # default: deploy + wait + push
+bash run.sh --follow         # stream pod logs in real-time while waiting
+bash run.sh --no-push        # deploy + wait only, skip dashboard push
+bash run.sh --config my.yaml # use a different config file
 ```
 
 ---
 
-## Quick Start
+## Repository Structure
 
-### Prerequisites
+```
+spyre-benchmark-suite/
+├── run.sh                          # Single-command entry point
+├── .env.example                    # Credentials template (copy to .env)
+├── build.yaml.tpl                  # Pod spec template (auto-rendered)
+├── build.yaml                      # Generated — do not edit directly
+├── config/
+│   └── benchmark_config.yaml       # THE file to configure everything
+├── scripts/
+│   ├── render_build_yaml.py        # Config → build.yaml renderer
+│   ├── generate_test_configs.py    # Config → vLLM JSON test format
+│   ├── run_benchmarks.sh           # Benchmark orchestrator (runs inside pod)
+│   ├── collect_results.py          # Aggregates results into summary
+│   ├── push_to_clickhouse.py       # Pushes results to ClickHouse
+│   ├── watcher.sh                  # Background polling watcher (alternative)
+│   └── clickhouse_admin.sh         # Admin: list, query, delete data
+└── deploy/
+    └── clickhouse-route/           # Route manifest for ClickHouse
+```
 
-- `oc` CLI installed
-- Access to the benchmark cluster: `https://api.torch-cicd.spyre.res.ibm.com:6443`
-- Python 3.7+ with `pyyaml` (for local config testing)
+---
 
-### Step 1: Configure Benchmarks
+## Configuration
 
-Edit `config/benchmark_config.yaml`:
+### `config/benchmark_config.yaml`
+
+This single file controls everything:
 
 ```yaml
+# What to benchmark
 engine:
   dtype: float16
   max_model_len: 3072
   max_num_seqs: 16
-  load_format: dummy        # "dummy" = random weights, "auto" = real weights
+  load_format: dummy              # "dummy" or "auto"
 
 models:
   - name: ibm-granite/granite-3.3-8b-instruct
@@ -50,192 +105,176 @@ workloads:
     - input_len: 128
       output_len: 128
       num_prompts: 20
+
+# Deployment settings
+deployment:
+  pod_name: yc-vllm-spyre-benchmark
+  namespace: torch-spyre-cicd
+  spyre_pf_cards: 1
+  benchmark_repo: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
+  benchmark_branch: main
+  spyre_inference_repo: https://github.com/torch-spyre/spyre-inference.git
+  spyre_inference_branch: main
+
+# Dashboard push settings
+dashboard:
+  benchmark_name: spyre_e2e_benchmark
+  auto_push: true
+  timeout: 3600
 ```
 
-### Step 2: Deploy Benchmark Pod
+### `.env` (secrets — gitignored)
 
 ```bash
-oc login --server=<benchmark-cluster-api-url>
-oc delete pod yc-vllm-spyre-benchmark-v2 -n torch-spyre-cicd 2>/dev/null
-oc apply -f build.yaml -n torch-spyre-cicd
-```
-
-### Step 3: Monitor Progress
-
-```bash
-oc logs -f yc-vllm-spyre-benchmark-v2 -n torch-spyre-cicd
-```
-
-### Step 4: Push Results to Dashboard (Automated)
-
-Run the watcher — it polls for completed pods and pushes to ClickHouse:
-
-```bash
-export CLICKHOUSE_URL="<clickhouse-route-url>"
-export CLICKHOUSE_USER="default"
-export CLICKHOUSE_PASSWORD="<password>"
-
-bash scripts/watcher.sh
-```
-
-Or run in background:
-```bash
-nohup bash scripts/watcher.sh >> watcher.log 2>&1 &
-```
-
-### Step 5: View on Dashboard
-
-Open: https://vllm-dashboard-spyre-cdev.apps.fmaas-devstage-backend.fmaas.res.ibm.com/benchmark/v3/dashboard/spyre_e2e_benchmark
-
----
-
-## Repository Structure
-
-```
-spyre-benchmark-suite/
-├── build.yaml                      # OpenShift Pod spec (4 user-configurable env vars)
-├── config/
-│   └── benchmark_config.yaml       # WHAT to benchmark — models, workloads, engine
-├── scripts/
-│   ├── generate_test_configs.py    # YAML config → vLLM JSON test format
-│   ├── run_benchmarks.sh           # Orchestrator: json2args + vllm bench CLI
-│   ├── collect_results.py          # Aggregates results into summary JSON + table
-│   ├── push_to_clickhouse.py       # Pushes results to ClickHouse (used by watcher)
-│   └── watcher.sh                  # Polls for completed pods, auto-pushes results
-├── deploy/
-│   └── clickhouse-route/
-│       ├── route.yaml              # OpenShift Route for ClickHouse (dashboard cluster)
-│       └── check-route.sh          # Checks if route exists
-└── results/
-    └── .gitkeep
+BENCHMARK_SERVER=<benchmark-cluster-api-url>
+CLICKHOUSE_URL=<clickhouse-route-url>
+CLICKHOUSE_USER=default
+CLICKHOUSE_PASSWORD=<password>
 ```
 
 ---
 
-## Watcher Guide
+## Supported Models (TP=1)
 
-The watcher (`scripts/watcher.sh`) is a local background process that:
-1. Polls the benchmark cluster every 60s for completed pods (label: `purpose=benchmark`)
-2. Extracts benchmark results from pod logs
-3. Pushes metrics to ClickHouse via the public HTTPS route
-4. Annotates processed pods to prevent duplicate pushes
-
-### Setup
-
-```bash
-# Required environment variables
-export CLICKHOUSE_URL="<clickhouse-route-url>"
-export CLICKHOUSE_USER="default"
-export CLICKHOUSE_PASSWORD="<password>"
-
-# Login to the benchmark cluster
-oc login --server=<benchmark-cluster-api-url>
-```
-
-### Run
-
-```bash
-# Foreground (see output live)
-bash scripts/watcher.sh
-
-# Background (logs to file)
-nohup bash scripts/watcher.sh >> watcher.log 2>&1 &
-
-# Check watcher log
-tail -f watcher.log
-```
-
-### Configuration
-
-| Env Var | Default | Description |
-|---------|---------|-------------|
-| `CLICKHOUSE_URL` | (required) | ClickHouse HTTPS endpoint |
-| `CLICKHOUSE_USER` | (required) | ClickHouse username |
-| `CLICKHOUSE_PASSWORD` | (required) | ClickHouse password |
-| `NAMESPACE` | `torch-spyre-cicd` | Namespace to watch for pods |
-| `BENCHMARK_NAME` | `spyre_e2e_benchmark` | Benchmark name in ClickHouse (must match dashboard config) |
-| `POLL_INTERVAL` | `60` | Seconds between polls |
-| `CONTAINER_NAME` | `app` | Container name to read logs from |
-
-### How It Works
-
-- Finds pods with label `purpose=benchmark` and `status.phase=Succeeded`
-- Skips pods already annotated with `benchmark-watcher/pushed=true`
-- Extracts JSON from log markers (`========== BENCHMARK RESULTS (JSON) ==========`)
-- Converts each metric to a ClickHouse row (one row per metric: latency, p50, p99, tokens/s, req/s)
-- Pushes via authenticated HTTPS POST
-- Annotates pod on success
-
-### Manual Push (without watcher)
-
-```bash
-oc logs yc-vllm-spyre-benchmark-v2 -n torch-spyre-cicd | \
-  python3 scripts/push_to_clickhouse.py --from-logs \
-    --clickhouse-url "$CLICKHOUSE_URL" \
-    --benchmark-name spyre_e2e_benchmark
-```
-
-### Clean Up Test Data
-
-```bash
-python3 scripts/push_to_clickhouse.py --delete \
-  --workflow-id <ID> \
-  --clickhouse-url "$CLICKHOUSE_URL" \
-  --benchmark-name spyre_e2e_benchmark
-```
-
----
-
-## build.yaml Reference
-
-### User-Configurable Environment Variables
-
-| Variable | What to set | Default |
-|----------|------------|---------|
-| `BENCHMARK_REPO` | Your fork URL | `https://github.com/YashasviChaurasia/spyre-benchmark-suite.git` |
-| `BENCHMARK_BRANCH` | Your branch | `main` |
-| `SPYRE_INFERENCE_REPO` | vLLM+Spyre repo | `https://github.com/torch-spyre/spyre-inference.git` |
-| `SPYRE_INFERENCE_BRANCH` | vLLM branch | `main` |
-
-### What the Pod Does
-
-```
-Pod starts on Spyre node
- ├─ 1. Installs uv, creates Python venv
- ├─ 2. Clones spyre-inference → installs vLLM v0.19.0 + Spyre plugin
- ├─ 3. Clones YOUR benchmark suite fork
- ├─ 4. Generates JSON test configs from benchmark_config.yaml
- ├─ 5. Runs vllm bench latency for each test case
- ├─ 6. Runs vllm bench throughput for each test case
- ├─ 7. Aggregates results → prints summary JSON to stdout
- └─ 8. Pod exits with status Completed
-```
-
-### Re-running Benchmarks
-
-```bash
-oc delete pod yc-vllm-spyre-benchmark-v2 -n torch-spyre-cicd
-oc apply -f build.yaml -n torch-spyre-cicd
-```
-
----
-
-## Config Reference
-
-### `config/benchmark_config.yaml`
-
-| Section | Fields | Description |
-|---------|--------|-------------|
-| `engine` | `dtype`, `max_model_len`, `max_num_seqs`, `load_format` | vLLM engine parameters |
-| `models[]` | `name`, `tensor_parallel_size` | Models to benchmark |
-| `workloads.latency[]` | `input_len`, `output_len`, `batch_size`, `num_iters_warmup`, `num_iters` | Latency tests |
-| `workloads.throughput[]` | `input_len`, `output_len`, `num_prompts` | Throughput tests |
-
-### Supported Models (TP=1)
-
-- `ibm-granite/granite-3.3-8b-instruct` (max_model_len=3072, max_num_seqs=16)
+- `ibm-granite/granite-3.3-8b-instruct` (max_model_len=3072)
 - `ibm-granite/granite-4-8b-dense`
 - `meta-llama/Llama-3.1-8B-Instruct` (gated — needs HF_TOKEN)
+
+---
+
+## Admin Operations
+
+```bash
+# List all benchmark runs in the database
+bash scripts/clickhouse_admin.sh list
+
+# Count rows
+bash scripts/clickhouse_admin.sh count
+
+# Delete a specific run
+bash scripts/clickhouse_admin.sh delete-workflow <workflow_id>
+
+# Delete all spyre data
+bash scripts/clickhouse_admin.sh delete-all
+
+# Run arbitrary SQL
+bash scripts/clickhouse_admin.sh query "SELECT count() FROM benchmark.oss_ci_benchmark_v3"
+```
+
+---
+
+## Alternative: Background Watcher
+
+If you want continuous monitoring instead of one-shot runs:
+
+```bash
+bash scripts/watcher.sh
+```
+
+This polls every 60s for completed benchmark pods and pushes their results automatically. Useful when multiple users deploy benchmark pods.
+
+---
+
+## Re-running Benchmarks
+
+Just run again — the script handles cleanup:
+
+```bash
+bash run.sh
+```
+
+Or change config and re-run:
+
+```bash
+vim config/benchmark_config.yaml   # change models/workloads
+bash run.sh
+```
+
+---
+
+## What Happens During a Run
+
+When you run `bash run.sh`, the pod goes through these phases:
+
+1. **Build phase** (~10-15 min): Installs `uv`, clones `spyre-inference`, builds vLLM 0.19.0 + torch-spyre from source
+2. **Benchmark phase** (~2-5 min): Runs `vllm bench latency` and `vllm bench throughput` for each test case
+3. **Collection phase**: Aggregates results, prints summary JSON between markers
+4. **Pod exits** with status `Succeeded`
+
+### Successful Output
+
+On a successful run, `run.sh` prints:
+
+```
+==========================================
+  Spyre Benchmark Suite
+==========================================
+  Config:    config/benchmark_config.yaml
+  Pod:       yc-vllm-spyre-benchmark
+  Namespace: torch-spyre-cicd
+  Timeout:   3600s
+  Auto-push: true
+==========================================
+[run] Rendering build.yaml from config...
+[run] Deploying benchmark pod...
+[run] Pod yc-vllm-spyre-benchmark deployed. Waiting for completion...
+pod/yc-vllm-spyre-benchmark condition met
+[run] Pod completed successfully.
+[run] Pushing results to dashboard...
+Summary: 2 tests, timestamp=20260506T051854Z
+Generated 5 ClickHouse rows (workflow_id=1778044734)
+SUCCESS: 5 rows inserted into oss_ci_benchmark_v3
+SUCCESS: 5 metadata rows inserted
+==========================================
+  Done!
+==========================================
+```
+
+<!-- TODO: Add screenshot of pod completion in OpenShift console -->
+<!-- ![Pod Completion](docs/pod-completion.png) -->
+
+---
+
+## Querying the Database
+
+You can run arbitrary SQL against ClickHouse:
+
+```bash
+# Count all entries
+bash scripts/clickhouse_admin.sh query "SELECT count() FROM benchmark.oss_ci_benchmark_v3"
+
+# List recent results with timestamps
+bash scripts/clickhouse_admin.sh query "
+  SELECT workflow_id, fromUnixTimestamp64Milli(timestamp) as time, metric.name, model.name
+  FROM benchmark.oss_ci_benchmark_v3
+  WHERE benchmark.name = 'spyre_e2e_benchmark'
+  ORDER BY timestamp DESC
+  LIMIT 20
+  FORMAT Pretty
+"
+
+# Check what models have data
+bash scripts/clickhouse_admin.sh query "
+  SELECT DISTINCT model.name FROM benchmark.oss_ci_benchmark_v3
+  WHERE benchmark.name = 'spyre_e2e_benchmark'
+  FORMAT Pretty
+"
+```
+
+---
+
+## Cleanup
+
+```bash
+# Delete a specific benchmark run by workflow ID
+bash scripts/clickhouse_admin.sh delete-workflow 1778044734
+
+# Delete ALL spyre benchmark data (with confirmation prompt)
+bash scripts/clickhouse_admin.sh delete-all
+
+# List runs to find workflow IDs
+bash scripts/clickhouse_admin.sh list
+```
 
 ---
 
@@ -246,10 +285,8 @@ oc apply -f build.yaml -n torch-spyre-cicd
 | Pod stuck in Pending | `oc describe pod ...` — likely no Spyre PF card available |
 | Pod exits immediately | `oc logs ...` — check for git clone / uv sync errors |
 | Tests fail but pod completes | Look for `FAIL:` in logs — reduce `max_model_len` or `batch_size` |
-| Watcher not pushing | Check `oc whoami` (logged in?), check `CLICKHOUSE_URL` is set |
-| ClickHouse auth error | Verify `CLICKHOUSE_PASSWORD` env var is correct |
-| Dashboard not showing data | Check `benchmark.name` is `spyre_e2e_benchmark` and metadata rows exist |
-| Duplicate pushes | Pod should have annotation `benchmark-watcher/pushed=true` |
+| Push fails | Verify `.env` has correct `CLICKHOUSE_PASSWORD` |
+| Dashboard not showing data | Ensure `benchmark_name` matches dashboard config (`spyre_e2e_benchmark`) |
 
 ---
 
@@ -258,5 +295,5 @@ oc apply -f build.yaml -n torch-spyre-cicd
 ```bash
 pip install pyyaml
 python3 scripts/generate_test_configs.py config/benchmark_config.yaml results/
-cat results/latency-tests.json
+python3 scripts/render_build_yaml.py     # verify build.yaml renders correctly
 ```

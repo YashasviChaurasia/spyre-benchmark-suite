@@ -1,12 +1,16 @@
 # Spyre vLLM Benchmark Configuration
-# Edit this file in your fork to customize benchmarks.
+# This is the ONLY file you need to edit. Then run: bash run.sh
+
+# ===================================================
+# WHAT TO BENCHMARK
+# ===================================================
 
 # vLLM engine settings for Spyre
 engine:
   dtype: float16
   max_model_len: 3072
   max_num_seqs: 16
-  load_format: dummy
+  load_format: dummy          # "dummy" = random weights, "auto" = real HF weights
 
 # Models to benchmark
 models:
@@ -27,7 +31,38 @@ workloads:
       output_len: 128
       num_prompts: 20
 
-# Metadata (attached to results)
+# ===================================================
+# DEPLOYMENT SETTINGS
+# ===================================================
+
+deployment:
+  # Pod identity
+  pod_name: yc-vllm-spyre-benchmark
+  namespace: torch-spyre-cicd
+  spyre_pf_cards: 1
+
+  # Source repos (what the pod clones and builds)
+  benchmark_repo: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
+  benchmark_branch: main
+  spyre_inference_repo: https://github.com/torch-spyre/spyre-inference.git
+  spyre_inference_branch: main
+
+# ===================================================
+# DASHBOARD SETTINGS
+# ===================================================
+
+dashboard:
+  # Benchmark name registered in the dashboard frontend
+  benchmark_name: spyre_e2e_benchmark
+  # Automatically push results after pod completes
+  auto_push: true
+  # Max time to wait for pod to finish (seconds)
+  timeout: 3600
+
+# ===================================================
+# METADATA (attached to results)
+# ===================================================
+
 metadata:
   device_type: IBM_Spyre_PF
   suite_version: "0.1.0"
