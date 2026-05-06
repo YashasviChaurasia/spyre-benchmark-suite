@@ -28,6 +28,10 @@ def collect_latency_results(results_dir: str) -> list[dict]:
             print(f"  WARNING: Could not read {f}: {e}")
             continue
 
+        # Handle list format (vLLM 0.19+) vs dict format
+        if isinstance(data, list):
+            data = data[0] if data else {}
+
         result = {
             "test_name": test_name,
             "type": "latency",
@@ -64,6 +68,10 @@ def collect_throughput_results(results_dir: str) -> list[dict]:
         except (json.JSONDecodeError, OSError) as e:
             print(f"  WARNING: Could not read {f}: {e}")
             continue
+
+        # Handle list format (vLLM 0.19+) vs dict format
+        if isinstance(data, list):
+            data = data[0] if data else {}
 
         result = {
             "test_name": test_name,
