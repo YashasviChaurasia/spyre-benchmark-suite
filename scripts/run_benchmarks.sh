@@ -211,7 +211,9 @@ run_serve_benchmarks() {
         echo "┌─ [serve] $test_name"
         local client_args
         client_args=$(json2args "$client_params")
-        local bench_command="$BENCH_CMD serve --output-json $RESULTS_DIR/${test_name}.json $client_args"
+        local result_dir="$RESULTS_DIR/serve_results"
+        mkdir -p "$result_dir"
+        local bench_command="$BENCH_CMD serve --result-dir $result_dir --result-filename ${test_name}.json $client_args"
         echo "│ Command: $bench_command"
         echo "│"
 
@@ -224,9 +226,12 @@ run_serve_benchmarks() {
             > "$RESULTS_DIR/${test_name}.commands"
 
         if eval "$bench_command" 2>&1; then
-            if [[ -f "$RESULTS_DIR/${test_name}.json" ]]; then
+            local result_file="$result_dir/${test_name}.json"
+            if [[ -f "$result_file" ]]; then
+                # Copy to main results dir for collection
+                cp "$result_file" "$RESULTS_DIR/${test_name}.json"
                 echo "│"
-                echo "│ Result: $(jq -r '"TTFT_p50=\(.ttft_ms_p50 // .median_ttft_ms // "N/A")ms  TPOT_p50=\(.tpot_ms_p50 // .median_tpot_ms // "N/A")ms  \(.output_throughput // .request_throughput // "N/A") tok/s"' "$RESULTS_DIR/${test_name}.json" 2>/dev/null || echo "see JSON")"
+                echo "│ Result: $(jq -r '"TTFT_p50=\(.median_ttft_ms // "N/A")ms  TPOT_p50=\(.median_tpot_ms // "N/A")ms  throughput=\(.output_throughput // .request_throughput // "N/A") tok/s"' "$result_file" 2>/dev/null || echo "see JSON")"
             fi
             echo "└─ PASS"
             pass_count=$((pass_count + 1))
