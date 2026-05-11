@@ -24,7 +24,7 @@ spec:
         - name: BENCHMARK_REPO
           value: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
         - name: BENCHMARK_BRANCH
-          value: main
+          value: feat/parallel-model-execution
         - name: SPYRE_INFERENCE_REPO
           value: https://github.com/torch-spyre/spyre-inference.git
         - name: SPYRE_INFERENCE_BRANCH
