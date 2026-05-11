@@ -17,14 +17,18 @@ spec:
       resources:
         limits:
           ibm.com/spyre_pf: '2'
+          memory: 256Gi
         requests:
           ibm.com/spyre_pf: '2'
+          memory: 256Gi
       workingDir: /dev/shm
       env:
         - name: BENCHMARK_REPO
           value: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
         - name: BENCHMARK_BRANCH
           value: feat/parallel-model-execution
+        - name: PARALLEL
+          value: 'true'
         - name: SPYRE_INFERENCE_REPO
           value: https://github.com/torch-spyre/spyre-inference.git
         - name: SPYRE_INFERENCE_BRANCH
@@ -125,4 +129,4 @@ spec:
     - name: dev-shm
       emptyDir:
         medium: Memory
-        sizeLimit: 64Gi
+        sizeLimit: 256Gi
