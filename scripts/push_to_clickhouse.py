@@ -441,10 +441,9 @@ def main():
     # Load summary
     if args.from_logs:
         log_text = sys.stdin.read()
-        summary = extract_summary_from_logs(log_text)
-        if not summary or summary.get("total_tests", 0) == 0:
-            # Fallback: build summary from individual result JSONs in logs
-            print("Summary empty, extracting individual results from logs...")
+        # Always use individual extraction — it produces better data with model names
+        # and correctly separates serve results from offline results
+        if True:
             individual = extract_individual_results_from_logs(log_text)
             ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
             results = []
