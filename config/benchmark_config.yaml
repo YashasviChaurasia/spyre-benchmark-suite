@@ -41,6 +41,16 @@ workloads:
       output_len: 256
       num_prompts: 50
 
+  serve:
+    - input_len: 128
+      output_len: 128
+      num_prompts: 100
+      request_rate: 5
+    - input_len: 256
+      output_len: 256
+      num_prompts: 100
+      request_rate: 5
+
 # ===================================================
 # DEPLOYMENT SETTINGS
 # ===================================================
@@ -50,7 +60,7 @@ deployment:
   namespace: torch-spyre-cicd
   spyre_pf_cards: 1
   benchmark_repo: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
-  benchmark_branch: main
+  benchmark_branch: feat/online-bench-serve
   spyre_inference_repo: https://github.com/torch-spyre/spyre-inference.git
   spyre_inference_branch: main
 

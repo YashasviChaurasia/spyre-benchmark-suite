@@ -121,6 +121,134 @@ run_benchmark_tests() {
 }
 
 # -----------------------------------------------
+# Run serve benchmarks (online — starts server per model)
+# -----------------------------------------------
+run_serve_benchmarks() {
+    local test_file=$1
+    local pass_count=0
+    local fail_count=0
+    local total
+    local current_model=""
+    local server_pid=""
+
+    total=$(jq '. | length' "$test_file")
+
+    echo ""
+    echo "╔════════════════════════════════════════════╗"
+    echo "║  SERVE BENCHMARKS ($total tests)          "
+    echo "╚════════════════════════════════════════════╝"
+
+    while read -r test_config; do
+        local test_name
+        test_name=$(echo "$test_config" | jq -r '.test_name')
+        local server_params
+        server_params=$(echo "$test_config" | jq -r '.server_parameters')
+        local client_params
+        client_params=$(echo "$test_config" | jq -r '.client_parameters')
+        local model
+        model=$(echo "$server_params" | jq -r '.model')
+
+        # Start/restart server if model changed
+        if [[ "$model" != "$current_model" ]]; then
+            # Stop previous server
+            if [[ -n "$server_pid" ]]; then
+                echo "│ Stopping server (pid=$server_pid)..."
+                kill "$server_pid" 2>/dev/null || true
+                wait "$server_pid" 2>/dev/null || true
+                server_pid=""
+            fi
+
+            current_model="$model"
+            local server_args
+            server_args=$(json2args "$server_params")
+
+            echo ""
+            echo "┌─ [serve] Starting vLLM server: $model"
+            echo "│ Args: $server_args"
+            echo "│"
+
+            # Start vLLM server in background
+            vllm serve $model \
+                --dtype $(echo "$server_params" | jq -r '.dtype') \
+                --max-model-len $(echo "$server_params" | jq -r '.max_model_len') \
+                --load-format $(echo "$server_params" | jq -r '.load_format') \
+                --tensor-parallel-size $(echo "$server_params" | jq -r '.tensor_parallel_size') \
+                --port 8000 \
+                > "$RESULTS_DIR/server_${test_name}.log" 2>&1 &
+            server_pid=$!
+
+            # Wait for server to be ready
+            echo "│ Waiting for server to be ready..."
+            local retries=0
+            local max_retries=120
+            while [[ $retries -lt $max_retries ]]; do
+                if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+                    echo "│ Server ready (took ${retries}s)"
+                    break
+                fi
+                if ! kill -0 "$server_pid" 2>/dev/null; then
+                    echo "│ Server process died!"
+                    echo "└─ FAIL (server crashed)"
+                    fail_count=$((fail_count + total))
+                    server_pid=""
+                    break 2
+                fi
+                sleep 1
+                retries=$((retries + 1))
+            done
+
+            if [[ $retries -ge $max_retries ]]; then
+                echo "│ Server failed to start within ${max_retries}s"
+                echo "└─ FAIL (server timeout)"
+                kill "$server_pid" 2>/dev/null || true
+                server_pid=""
+                continue
+            fi
+        fi
+
+        # Run client benchmark
+        echo ""
+        echo "┌─ [serve] $test_name"
+        local client_args
+        client_args=$(json2args "$client_params")
+        local bench_command="$BENCH_CMD serve --output-json $RESULTS_DIR/${test_name}.json $client_args"
+        echo "│ Command: $bench_command"
+        echo "│"
+
+        # Save command
+        jq -n \
+            --arg command "$bench_command" \
+            --arg device "spyre" \
+            --arg timestamp "$TIMESTAMP" \
+            '{command: $command, device: $device, timestamp: $timestamp}' \
+            > "$RESULTS_DIR/${test_name}.commands"
+
+        if eval "$bench_command" 2>&1; then
+            if [[ -f "$RESULTS_DIR/${test_name}.json" ]]; then
+                echo "│"
+                echo "│ Result: $(jq -r '"TTFT_p50=\(.ttft_ms_p50 // .median_ttft_ms // "N/A")ms  TPOT_p50=\(.tpot_ms_p50 // .median_tpot_ms // "N/A")ms  \(.output_throughput // .request_throughput // "N/A") tok/s"' "$RESULTS_DIR/${test_name}.json" 2>/dev/null || echo "see JSON")"
+            fi
+            echo "└─ PASS"
+            pass_count=$((pass_count + 1))
+        else
+            echo "└─ FAIL (exit code: $?)"
+            fail_count=$((fail_count + 1))
+        fi
+    done < <(jq -c '.[]' "$test_file")
+
+    # Stop server
+    if [[ -n "$server_pid" ]]; then
+        echo ""
+        echo "  Stopping server (pid=$server_pid)..."
+        kill "$server_pid" 2>/dev/null || true
+        wait "$server_pid" 2>/dev/null || true
+    fi
+
+    echo ""
+    echo "  serve result: $pass_count passed, $fail_count failed (of $total)"
+}
+
+# -----------------------------------------------
 # Main
 # -----------------------------------------------
 main() {
@@ -150,12 +278,21 @@ main() {
     # Step 3: Run throughput benchmarks
     run_benchmark_tests "throughput" "$RESULTS_DIR/throughput-tests.json"
 
-    # Step 4: Collect and summarize results
+    # Step 4: Run serve benchmarks (online)
+    if [[ -f "$RESULTS_DIR/serve-tests.json" ]]; then
+        local serve_count
+        serve_count=$(jq '. | length' "$RESULTS_DIR/serve-tests.json")
+        if [[ "$serve_count" -gt 0 ]]; then
+            run_serve_benchmarks "$RESULTS_DIR/serve-tests.json"
+        fi
+    fi
+
+    # Step 5: Collect and summarize results
     echo ""
     echo "=== Collecting results ==="
     python3 "$SCRIPT_DIR/collect_results.py" "$RESULTS_DIR" "$TIMESTAMP" || echo "WARNING: collect_results.py failed (results still available as individual JSONs)"
 
-    # Step 5: Print results to stdout for log capture
+    # Step 6: Print results to stdout for log capture
     echo ""
     echo "========== BENCHMARK RESULTS (JSON) =========="
     if [[ -f "$RESULTS_DIR/benchmark_summary.json" ]]; then
