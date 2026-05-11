@@ -14,41 +14,18 @@ engine:
 
 # Models to benchmark
 models:
-  - name: ibm-granite/granite-3.3-8b-instruct
-    tensor_parallel_size: 1
   - name: ibm-ai-platform/micro-g3.3-8b-instruct-1b
     tensor_parallel_size: 1
 
 # Benchmark workloads
 workloads:
-  latency:
-    - input_len: 128
-      output_len: 128
-      batch_size: 1
-      num_iters_warmup: 3
-      num_iters: 10
-    - input_len: 256
-      output_len: 256
-      batch_size: 1
-      num_iters_warmup: 3
-      num_iters: 10
-
-  throughput:
-    - input_len: 128
-      output_len: 128
-      num_prompts: 50
-    - input_len: 256
-      output_len: 256
-      num_prompts: 50
+  latency: []
+  throughput: []
 
   serve:
     - input_len: 128
       output_len: 128
-      num_prompts: 100
-      request_rate: 5
-    - input_len: 256
-      output_len: 256
-      num_prompts: 100
+      num_prompts: 20
       request_rate: 5
 
 # ===================================================
