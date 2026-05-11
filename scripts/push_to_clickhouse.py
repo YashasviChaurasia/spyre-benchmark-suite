@@ -78,6 +78,81 @@ def extract_summary_from_logs(log_text):
     return _parse_json_block(json_lines)
 
 
+def extract_serve_results_from_logs(log_text):
+    """Extract serve benchmark results from the text output in logs.
+
+    Parses blocks like:
+        ┌─ [serve] serve_model_name_in128_out128_n20_rr5
+        │ Command: vllm bench serve ...
+        ...
+        ============ Serving Benchmark Result ============
+        Request throughput (req/s):    2.48
+        Output token throughput (tok/s): 317.93
+        Mean TTFT (ms):                969.52
+        Median TTFT (ms):              776.88
+        P99 TTFT (ms):                 2345.52
+        Mean TPOT (ms):                37.29
+        Median TPOT (ms):              37.08
+        P99 TPOT (ms):                 46.12
+        ==================================================
+    """
+    import re
+    results = []
+    lines = log_text.split("\n")
+    i = 0
+    current_test_name = None
+    current_model = None
+
+    while i < len(lines):
+        line = lines[i].strip()
+
+        # Detect serve test name from the command line
+        m = re.match(r'.*\[serve\]\s+(serve_\S+)', line)
+        if m and "Starting vLLM server" not in line:
+            current_test_name = m.group(1)
+
+        # Detect model from "Starting vLLM server: <model>"
+        m = re.match(r'.*Starting vLLM server:\s+(.+)', line)
+        if m:
+            current_model = m.group(1).strip()
+
+        # Parse result block
+        if "Serving Benchmark Result" in line and current_test_name:
+            metrics = {}
+            i += 1
+            while i < len(lines) and "=====" not in lines[i]:
+                row = lines[i].strip()
+                # Parse "Metric Name:    value"
+                m = re.match(r'^(.+?):\s+([\d.]+)', row)
+                if m:
+                    key = m.group(1).strip().lower().replace(" ", "_").replace("(", "").replace(")", "")
+                    val = float(m.group(2))
+                    metrics[key] = val
+                i += 1
+
+            if metrics:
+                r = {
+                    "test_name": current_test_name,
+                    "type": "serve",
+                    "request_throughput": metrics.get("request_throughput_req/s"),
+                    "output_token_throughput": metrics.get("output_token_throughput_tok/s"),
+                    "mean_ttft_ms": metrics.get("mean_ttft_ms"),
+                    "median_ttft_ms": metrics.get("median_ttft_ms"),
+                    "p99_ttft_ms": metrics.get("p99_ttft_ms"),
+                    "mean_tpot_ms": metrics.get("mean_tpot_ms"),
+                    "median_tpot_ms": metrics.get("median_tpot_ms"),
+                    "p99_tpot_ms": metrics.get("p99_tpot_ms"),
+                }
+                if current_model:
+                    r["model"] = current_model
+                results.append(r)
+            current_test_name = None
+        else:
+            i += 1
+
+    return results
+
+
 def extract_individual_results_from_logs(log_text):
     """Extract individual result JSONs from the per-file printout in logs.
 
@@ -190,6 +265,19 @@ def summary_to_clickhouse_rows(summary, head_sha=None, head_branch="main",
                 metrics["tokens_per_second"] = result["tokens_per_second"]
             if result.get("requests_per_second") is not None:
                 metrics["requests_per_second"] = result["requests_per_second"]
+        elif test_type == "serve":
+            if result.get("output_token_throughput") is not None:
+                metrics["serve_output_throughput"] = result["output_token_throughput"]
+            if result.get("request_throughput") is not None:
+                metrics["serve_request_throughput"] = result["request_throughput"]
+            if result.get("median_ttft_ms") is not None:
+                metrics["serve_ttft_ms"] = result["median_ttft_ms"]
+            if result.get("p99_ttft_ms") is not None:
+                metrics["serve_p99_ttft_ms"] = result["p99_ttft_ms"]
+            if result.get("median_tpot_ms") is not None:
+                metrics["serve_tpot_ms"] = result["median_tpot_ms"]
+            if result.get("p99_tpot_ms") is not None:
+                metrics["serve_p99_tpot_ms"] = result["p99_tpot_ms"]
 
         for metric_name, value in metrics.items():
             extra = dict(base_extra)
@@ -358,26 +446,31 @@ def main():
             # Fallback: build summary from individual result JSONs in logs
             print("Summary empty, extracting individual results from logs...")
             individual = extract_individual_results_from_logs(log_text)
-            if individual:
-                ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-                results = []
-                for test_name, data in individual.items():
-                    if test_name.startswith("latency_"):
-                        r = {"test_name": test_name, "type": "latency"}
-                        r["avg_latency_s"] = data.get("avg_latency")
-                        pcts = data.get("percentiles", {})
-                        r["p50_latency_s"] = pcts.get("50")
-                        r["p99_latency_s"] = pcts.get("99")
-                        if data.get("model"):
-                            r["model"] = data["model"]
-                        results.append(r)
-                    elif test_name.startswith("throughput_"):
-                        r = {"test_name": test_name, "type": "throughput"}
-                        r["tokens_per_second"] = data.get("tokens_per_second")
-                        r["requests_per_second"] = data.get("requests_per_second")
-                        if data.get("model"):
-                            r["model"] = data["model"]
-                        results.append(r)
+            ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            results = []
+            for test_name, data in individual.items():
+                if test_name.startswith("latency_"):
+                    r = {"test_name": test_name, "type": "latency"}
+                    r["avg_latency_s"] = data.get("avg_latency")
+                    pcts = data.get("percentiles", {})
+                    r["p50_latency_s"] = pcts.get("50")
+                    r["p99_latency_s"] = pcts.get("99")
+                    if data.get("model"):
+                        r["model"] = data["model"]
+                    results.append(r)
+                elif test_name.startswith("throughput_"):
+                    r = {"test_name": test_name, "type": "throughput"}
+                    r["tokens_per_second"] = data.get("tokens_per_second")
+                    r["requests_per_second"] = data.get("requests_per_second")
+                    if data.get("model"):
+                        r["model"] = data["model"]
+                    results.append(r)
+
+            # Also extract serve results from text output
+            serve_results = extract_serve_results_from_logs(log_text)
+            results.extend(serve_results)
+
+            if results:
                 summary = {"timestamp": ts, "device": "IBM_Spyre_PF", "total_tests": len(results), "results": results}
             else:
                 print("ERROR: No results found in logs")

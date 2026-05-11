@@ -213,7 +213,7 @@ run_serve_benchmarks() {
         client_args=$(json2args "$client_params")
         local result_dir="$RESULTS_DIR/serve_results"
         mkdir -p "$result_dir"
-        local bench_command="$BENCH_CMD serve --result-dir $result_dir --result-filename ${test_name}.json $client_args"
+        local bench_command="$BENCH_CMD serve --save-result --result-dir $result_dir --result-filename ${test_name}.json $client_args"
         echo "│ Command: $bench_command"
         echo "│"
 
