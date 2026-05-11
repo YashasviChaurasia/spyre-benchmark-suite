@@ -10,17 +10,34 @@ engine:
   dtype: float16
   max_model_len: 3072
   max_num_seqs: 16
-  load_format: auto               # "auto" = download real weights from HuggingFace
+  load_format: auto               # "auto" = real HF weights, "dummy" = random weights
 
 # Models to benchmark
 models:
+  - name: ibm-granite/granite-3.3-8b-instruct
+    tensor_parallel_size: 1
   - name: ibm-ai-platform/micro-g3.3-8b-instruct-1b
     tensor_parallel_size: 1
 
-# Benchmark workloads
+# Which benchmark types to run (comment out to disable)
+benchmarks:
+  - latency
+  - throughput
+  - serve
+
+# Workload definitions per benchmark type
 workloads:
-  latency: []
-  throughput: []
+  latency:
+    - input_len: 128
+      output_len: 128
+      batch_size: 1
+      num_iters_warmup: 3
+      num_iters: 10
+
+  throughput:
+    - input_len: 128
+      output_len: 128
+      num_prompts: 50
 
   serve:
     - input_len: 128

@@ -133,25 +133,29 @@ def main():
 
     os.makedirs(output_dir, exist_ok=True)
 
-    latency_tests = generate_latency_tests(config)
-    throughput_tests = generate_throughput_tests(config)
-    serve_tests = generate_serve_tests(config)
+    # Which benchmark types are enabled
+    enabled = config.get("benchmarks", ["latency", "throughput"])
 
-    latency_path = os.path.join(output_dir, "latency-tests.json")
-    with open(latency_path, "w") as f:
-        json.dump(latency_tests, f, indent=4)
+    if "latency" in enabled:
+        latency_tests = generate_latency_tests(config)
+        latency_path = os.path.join(output_dir, "latency-tests.json")
+        with open(latency_path, "w") as f:
+            json.dump(latency_tests, f, indent=4)
+        print(f"Generated {len(latency_tests)} latency tests -> {latency_path}")
 
-    throughput_path = os.path.join(output_dir, "throughput-tests.json")
-    with open(throughput_path, "w") as f:
-        json.dump(throughput_tests, f, indent=4)
+    if "throughput" in enabled:
+        throughput_tests = generate_throughput_tests(config)
+        throughput_path = os.path.join(output_dir, "throughput-tests.json")
+        with open(throughput_path, "w") as f:
+            json.dump(throughput_tests, f, indent=4)
+        print(f"Generated {len(throughput_tests)} throughput tests -> {throughput_path}")
 
-    serve_path = os.path.join(output_dir, "serve-tests.json")
-    with open(serve_path, "w") as f:
-        json.dump(serve_tests, f, indent=4)
-
-    print(f"Generated {len(latency_tests)} latency tests -> {latency_path}")
-    print(f"Generated {len(throughput_tests)} throughput tests -> {throughput_path}")
-    print(f"Generated {len(serve_tests)} serve tests -> {serve_path}")
+    if "serve" in enabled:
+        serve_tests = generate_serve_tests(config)
+        serve_path = os.path.join(output_dir, "serve-tests.json")
+        with open(serve_path, "w") as f:
+            json.dump(serve_tests, f, indent=4)
+        print(f"Generated {len(serve_tests)} serve tests -> {serve_path}")
 
 
 if __name__ == "__main__":
