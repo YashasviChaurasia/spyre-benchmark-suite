@@ -267,17 +267,17 @@ def summary_to_clickhouse_rows(summary, head_sha=None, head_branch="main",
                 metrics["requests_per_second"] = result["requests_per_second"]
         elif test_type == "serve":
             if result.get("output_token_throughput") is not None:
-                metrics["serve_output_throughput"] = result["output_token_throughput"]
+                metrics["tokens_per_second"] = result["output_token_throughput"]
             if result.get("request_throughput") is not None:
-                metrics["serve_request_throughput"] = result["request_throughput"]
+                metrics["requests_per_second"] = result["request_throughput"]
             if result.get("median_ttft_ms") is not None:
-                metrics["serve_ttft_ms"] = result["median_ttft_ms"]
+                metrics["median_ttft_ms"] = result["median_ttft_ms"]
             if result.get("p99_ttft_ms") is not None:
-                metrics["serve_p99_ttft_ms"] = result["p99_ttft_ms"]
+                metrics["p99_ttft_ms"] = result["p99_ttft_ms"]
             if result.get("median_tpot_ms") is not None:
-                metrics["serve_tpot_ms"] = result["median_tpot_ms"]
+                metrics["median_tpot_ms"] = result["median_tpot_ms"]
             if result.get("p99_tpot_ms") is not None:
-                metrics["serve_p99_tpot_ms"] = result["p99_tpot_ms"]
+                metrics["p99_tpot_ms"] = result["p99_tpot_ms"]
 
         for metric_name, value in metrics.items():
             extra = dict(base_extra)
