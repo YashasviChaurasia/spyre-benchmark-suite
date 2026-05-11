@@ -42,10 +42,13 @@ bash run.sh
  ├─ 1. Reads config/benchmark_config.yaml
  ├─ 2. Renders build.yaml from template (build.yaml.tpl)
  ├─ 3. Deploys the benchmark pod to OpenShift
- ├─ 4. Waits for pod to complete (configurable timeout)
- ├─ 5. Extracts results from pod logs
- ├─ 6. Pushes metrics to ClickHouse (dashboard DB)
- ├─ 7. Annotates pod as processed
+ ├─ 4. Pod builds vLLM, then runs enabled benchmarks:
+ │      • latency  — raw single-batch inference time
+ │      • throughput — max engine tok/s (offline)
+ │      • serve — starts vLLM server, sends client traffic (online)
+ ├─ 5. Waits for pod to complete (configurable timeout)
+ ├─ 6. Extracts results from pod logs
+ ├─ 7. Pushes all metrics to ClickHouse (dashboard DB)
  └─ 8. Prints summary + dashboard link
 ```
 
@@ -104,17 +107,28 @@ models:
   - name: ibm-ai-platform/micro-g3.3-8b-instruct-1b
     tensor_parallel_size: 1
 
+# Which benchmark types to run (comment out to disable)
+benchmarks:
+  - latency
+  - throughput
+  - serve
+
 workloads:
   latency:
     - input_len: 128
       output_len: 128
       batch_size: 1
-      num_iters_warmup: 2
-      num_iters: 5
+      num_iters_warmup: 3
+      num_iters: 10
   throughput:
     - input_len: 128
       output_len: 128
+      num_prompts: 50
+  serve:
+    - input_len: 128
+      output_len: 128
       num_prompts: 20
+      request_rate: 5
 
 # Deployment settings
 deployment:
@@ -130,7 +144,7 @@ deployment:
 dashboard:
   benchmark_name: spyre_e2e_benchmark
   auto_push: true
-  timeout: 3600
+  timeout: 7200
 ```
 
 ### How the pod picks up your config
