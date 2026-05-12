@@ -47,6 +47,14 @@ spec:
           value: 'false'
         - name: AIU_SETUP_MULTI_AIU
           value: '1'
+        - name: AIU_WORLD_SIZE
+          value: '{{SPYRE_PF_CARDS}}'
+        - name: DEEPTOOLS_PATH
+          value: /opt/ibm/spyre/deeptools/share
+        - name: LD_LIBRARY_PATH
+          value: /opt/ibm/spyre/runtime/lib:/opt/ibm/spyre/deeptools/lib:/opt/ibm/spyre/senlib/lib
+        - name: DTLOG_LEVEL
+          value: error
         - name: SAVE_TO_PYTORCH_BENCHMARK_FORMAT
           value: '1'
       command:
