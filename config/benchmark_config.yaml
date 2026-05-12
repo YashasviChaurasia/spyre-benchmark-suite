@@ -18,7 +18,7 @@ models:
     tensor_parallel_size: 1
   - name: ibm-ai-platform/micro-g3.3-8b-instruct-1b
     tensor_parallel_size: 1
-  - name: meta-llama/Meta-Llama-3-8B
+  - name: ibm-granite/granite-3.3-2b-instruct
     tensor_parallel_size: 1
 
 # Which benchmark types to run (comment out to disable)
