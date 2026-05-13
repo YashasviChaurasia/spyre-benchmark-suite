@@ -92,12 +92,28 @@ spec:
             echo "=== Patching torch-spyre with fix/tp-multiproc-device-init ==="
             git clone --depth 1 -b fix/tp-multiproc-device-init \
               https://github.com/YashasviChaurasia/torch-spyre.git /dev/shm/torch-spyre-fix
-            for ts_dir in $(find /dev/shm/.venv -path "*/torch_spyre/__init__.py" -exec dirname {} \;); do
+            # Find all torch_spyre locations (follow symlinks, check both lib and lib64)
+            for ts_dir in $(find -L /dev/shm/.venv -path "*/torch_spyre/__init__.py" -exec dirname {} \; 2>/dev/null | sort -u); do
               echo "  Patching: $ts_dir"
               cp /dev/shm/torch-spyre-fix/torch_spyre/__init__.py "$ts_dir/__init__.py"
               cp /dev/shm/torch-spyre-fix/torch_spyre/device/interface.py "$ts_dir/device/interface.py"
             done
+            # Also check lib64 explicitly in case symlink resolves differently
+            if [ -d /dev/shm/.venv/lib64/python3.12/site-packages/torch_spyre ]; then
+              echo "  Patching lib64 explicitly"
+              cp /dev/shm/torch-spyre-fix/torch_spyre/__init__.py /dev/shm/.venv/lib64/python3.12/site-packages/torch_spyre/__init__.py
+              cp /dev/shm/torch-spyre-fix/torch_spyre/device/interface.py /dev/shm/.venv/lib64/python3.12/site-packages/torch_spyre/device/interface.py
+            fi
             rm -rf /dev/shm/torch-spyre-fix
+            python3 -c "
+import importlib.util, os
+spec = importlib.util.find_spec('torch_spyre')
+init_path = os.path.join(spec.submodule_search_locations[0], '__init__.py')
+content = open(init_path).read()
+has_fix = 'set_device' in content or 'LOCAL_RANK' in content
+print(f'  torch_spyre at: {spec.submodule_search_locations[0]}')
+print(f'  fix applied: {has_fix}')
+" 2>&1 || echo "  (verification skipped)"
             echo "  torch-spyre patch complete"
 
             # ---- Phase 4: Install benchmark dependencies ----
