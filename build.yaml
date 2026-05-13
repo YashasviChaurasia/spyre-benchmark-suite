@@ -49,6 +49,8 @@ spec:
           value: '1'
         - name: SAVE_TO_PYTORCH_BENCHMARK_FORMAT
           value: '1'
+        - name: VLLM_PLUGINS
+          value: spyre_inference
       command:
         - bash
         - -c
