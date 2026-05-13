@@ -123,6 +123,4 @@ spec:
   serviceAccount: default
   volumes:
     - name: dev-shm
-      emptyDir:
-        medium: Memory
-        sizeLimit: 64Gi
+      emptyDir: {}
