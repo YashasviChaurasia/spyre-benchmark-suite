@@ -17,10 +17,8 @@ spec:
       resources:
         limits:
           ibm.com/spyre_pf: '{{SPYRE_PF_CARDS}}'
-          memory: 512Gi
         requests:
           ibm.com/spyre_pf: '{{SPYRE_PF_CARDS}}'
-          memory: 512Gi
       workingDir: /dev/shm
       env:
         - name: BENCHMARK_REPO
@@ -123,6 +121,4 @@ spec:
   serviceAccount: default
   volumes:
     - name: dev-shm
-      emptyDir:
-        medium: Memory
-        sizeLimit: 512Gi
+      emptyDir: {}
