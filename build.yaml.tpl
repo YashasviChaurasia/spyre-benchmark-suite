@@ -53,6 +53,8 @@ spec:
           value: /opt/ibm/spyre/deeptools/share
         - name: LD_LIBRARY_PATH
           value: /opt/ibm/spyre/runtime/lib:/opt/ibm/spyre/deeptools/lib:/opt/ibm/spyre/senlib/lib
+        - name: VLLM_CPU_KVCACHE_SPACE
+          value: '16'
         - name: DTLOG_LEVEL
           value: error
         - name: SAVE_TO_PYTORCH_BENCHMARK_FORMAT
