@@ -20,8 +20,6 @@ models:
 # Which benchmark types to run (comment out to disable)
 benchmarks:
   - latency
-  - throughput
-  - serve
 
 # Workload definitions per benchmark type
 workloads:
@@ -29,8 +27,8 @@ workloads:
     - input_len: 128
       output_len: 128
       batch_size: 1
-      num_iters_warmup: 3
-      num_iters: 10
+      num_iters_warmup: 2
+      num_iters: 5
 
   throughput:
     - input_len: 128
@@ -52,9 +50,9 @@ deployment:
   namespace: torch-spyre-cicd
   spyre_pf_cards: 2
   benchmark_repo: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
-  benchmark_branch: main
-  spyre_inference_repo: https://github.com/torch-spyre/spyre-inference.git
-  spyre_inference_branch: main
+  benchmark_branch: test/tp2-fix-v2
+  spyre_inference_repo: https://github.com/YashasviChaurasia/spyre-inference.git
+  spyre_inference_branch: fix/tp-worker-set-device
 
 # ===================================================
 # DASHBOARD SETTINGS

@@ -24,11 +24,11 @@ spec:
         - name: BENCHMARK_REPO
           value: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
         - name: BENCHMARK_BRANCH
-          value: main
+          value: test/tp2-fix-v2
         - name: SPYRE_INFERENCE_REPO
-          value: https://github.com/torch-spyre/spyre-inference.git
+          value: https://github.com/YashasviChaurasia/spyre-inference.git
         - name: SPYRE_INFERENCE_BRANCH
-          value: main
+          value: fix/tp-worker-set-device
         - name: HF_TOKEN
           valueFrom:
             secretKeyRef:

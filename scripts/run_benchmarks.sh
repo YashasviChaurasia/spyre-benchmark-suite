@@ -96,9 +96,10 @@ run_single_test() {
         '{command: $command, device: $device, timestamp: $timestamp}' \
         > "$RESULTS_DIR/${test_name}.commands"
 
-    # Run with device isolation
-    if SPYRE_DEVICES=$spyre_devices AIU_WORLD_SIZE=$tp_size LOCAL_RANK=0 \
-        eval "$bench_command" 2>&1; then
+    # Run with device isolation (no LOCAL_RANK for TP>1 — workers manage their own rank)
+    local run_env="SPYRE_DEVICES=$spyre_devices AIU_WORLD_SIZE=$tp_size"
+    [[ $tp_size -eq 1 ]] && run_env="$run_env LOCAL_RANK=0"
+    if eval "$run_env $bench_command" 2>&1; then
         if [[ -f "$RESULTS_DIR/${test_name}.json" ]]; then
             echo "│"
             if [[ "$test_type" == "latency" ]]; then
@@ -278,8 +279,10 @@ run_serve_benchmarks() {
             echo "┌─ [serve] Starting vLLM server: $model (devices: $spyre_devices, tp: $tp_size)"
             echo "│"
 
-            # Start server with device isolation
-            SPYRE_DEVICES=$spyre_devices AIU_WORLD_SIZE=$tp_size LOCAL_RANK=0 \
+            # Start server with device isolation (no LOCAL_RANK for TP>1)
+            local _serve_lr=""
+            [[ $tp_size -eq 1 ]] && _serve_lr="LOCAL_RANK=0"
+            SPYRE_DEVICES=$spyre_devices AIU_WORLD_SIZE=$tp_size $_serve_lr \
                 vllm serve "$model" \
                 --dtype $(echo "$server_params" | jq -r '.dtype') \
                 --max-model-len $(echo "$server_params" | jq -r '.max_model_len') \
