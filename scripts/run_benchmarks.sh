@@ -97,8 +97,12 @@ run_single_test() {
         > "$RESULTS_DIR/${test_name}.commands"
 
     # Run with device isolation
-    if SPYRE_DEVICES=$spyre_devices AIU_WORLD_SIZE=$tp_size LOCAL_RANK=0 \
-        eval "$bench_command" 2>&1; then
+    # For TP>1: do NOT set LOCAL_RANK — let vLLM's set_device(rank) manage per-worker rank
+    local run_env="SPYRE_DEVICES=$spyre_devices AIU_WORLD_SIZE=$tp_size"
+    if [[ $tp_size -eq 1 ]]; then
+        run_env="$run_env LOCAL_RANK=0"
+    fi
+    if eval "$run_env $bench_command" 2>&1; then
         if [[ -f "$RESULTS_DIR/${test_name}.json" ]]; then
             echo "│"
             if [[ "$test_type" == "latency" ]]; then
@@ -279,8 +283,10 @@ run_serve_benchmarks() {
             echo "│"
 
             # Start server with device isolation
-            SPYRE_DEVICES=$spyre_devices AIU_WORLD_SIZE=$tp_size LOCAL_RANK=0 \
-                vllm serve "$model" \
+            # For TP>1: do NOT set LOCAL_RANK — let set_device(rank) manage per-worker
+            export SPYRE_DEVICES=$spyre_devices AIU_WORLD_SIZE=$tp_size
+            [[ $tp_size -eq 1 ]] && export LOCAL_RANK=0 || unset LOCAL_RANK
+            vllm serve "$model" \
                 --dtype $(echo "$server_params" | jq -r '.dtype') \
                 --max-model-len $(echo "$server_params" | jq -r '.max_model_len') \
                 --load-format $(echo "$server_params" | jq -r '.load_format') \
