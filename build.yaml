@@ -100,7 +100,7 @@ spec:
 
             # ---- Phase 3b: Install torch-spyre TP fix (multiproc device init) ----
             echo "=== Installing torch-spyre fix/tp-multiproc-device-init ==="
-            uv pip install --reinstall-package torch-spyre \
+            uv pip install --no-deps --reinstall-package torch-spyre \
               "torch-spyre @ git+https://github.com/YashasviChaurasia/torch-spyre.git@fix/tp-multiproc-device-init"
             python3 -c "import torch_spyre; print('torch-spyre installed from fix branch')"
 
