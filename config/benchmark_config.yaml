@@ -52,7 +52,7 @@ deployment:
   namespace: torch-spyre-cicd
   spyre_pf_cards: 2
   benchmark_repo: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
-  benchmark_branch: feat/multi-device-parallel
+  benchmark_branch: main
   spyre_inference_repo: https://github.com/torch-spyre/spyre-inference.git
   spyre_inference_branch: main
 
