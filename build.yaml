@@ -100,14 +100,15 @@ spec:
 
             # ---- Phase 3b: Patch torch-spyre with TP multiproc device init fix ----
             echo "=== Patching torch-spyre with fix/tp-multiproc-device-init ==="
-            TORCH_SPYRE_DIR=$(find /dev/shm/.venv -path "*/torch_spyre/__init__.py" -exec dirname {} \; | head -1)
-            echo "  torch-spyre location: $TORCH_SPYRE_DIR"
             git clone --depth 1 -b fix/tp-multiproc-device-init \
               https://github.com/YashasviChaurasia/torch-spyre.git /dev/shm/torch-spyre-fix
-            cp /dev/shm/torch-spyre-fix/torch_spyre/__init__.py "$TORCH_SPYRE_DIR/__init__.py"
-            cp /dev/shm/torch-spyre-fix/torch_spyre/device/interface.py "$TORCH_SPYRE_DIR/device/interface.py"
+            for ts_dir in $(find /dev/shm/.venv -path "*/torch_spyre/__init__.py" -exec dirname {} \;); do
+              echo "  Patching: $ts_dir"
+              cp /dev/shm/torch-spyre-fix/torch_spyre/__init__.py "$ts_dir/__init__.py"
+              cp /dev/shm/torch-spyre-fix/torch_spyre/device/interface.py "$ts_dir/device/interface.py"
+            done
             rm -rf /dev/shm/torch-spyre-fix
-            echo "  Patched: __init__.py + device/interface.py"
+            echo "  Patch complete"
 
             # ---- Phase 4: Install benchmark dependencies ----
             uv pip install pyyaml 2>/dev/null || pip install pyyaml
