@@ -14,15 +14,13 @@ engine:
 
 # Models to benchmark
 models:
-  - name: ibm-granite/granite-3.3-8b-instruct
-    tensor_parallel_size: 1
   - name: ibm-ai-platform/micro-g3.3-8b-instruct-1b
-    tensor_parallel_size: 1
+    tensor_parallel_size: 2
 
 # Which benchmark types to run (comment out to disable)
 benchmarks:
   - latency
-  - throughput
+  - serve
 
 # Workload definitions per benchmark type
 workloads:
