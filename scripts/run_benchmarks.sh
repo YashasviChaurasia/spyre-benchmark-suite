@@ -59,9 +59,20 @@ run_single_test() {
     local test_name=$2
     local bench_args=$3
     local device_id=${4:-0}
+    local tp_size=${5:-1}
+
+    # Calculate device range for TP>1
+    local spyre_devices="$device_id"
+    if [[ $tp_size -gt 1 ]]; then
+        local devices=()
+        for ((d=device_id; d<device_id+tp_size; d++)); do
+            devices+=("$d")
+        done
+        spyre_devices=$(IFS=,; echo "${devices[*]}")
+    fi
 
     echo ""
-    echo "┌─ [$test_type] $test_name (device: $device_id)"
+    echo "┌─ [$test_type] $test_name (devices: $spyre_devices, tp: $tp_size)"
 
     local bench_command
     if [[ -n "$BENCH_CMD" ]]; then
@@ -75,18 +86,18 @@ run_single_test() {
     fi
 
     echo "│ Command: $bench_command"
-    echo "│ Device: SPYRE_DEVICES=$device_id AIU_WORLD_SIZE=1"
+    echo "│ Env: SPYRE_DEVICES=$spyre_devices AIU_WORLD_SIZE=$tp_size"
     echo "│"
 
     jq -n \
         --arg command "$bench_command" \
-        --arg device "spyre:$device_id" \
+        --arg device "spyre:$spyre_devices" \
         --arg timestamp "$TIMESTAMP" \
         '{command: $command, device: $device, timestamp: $timestamp}' \
         > "$RESULTS_DIR/${test_name}.commands"
 
     # Run with device isolation
-    if SPYRE_DEVICES=$device_id AIU_WORLD_SIZE=1 LOCAL_RANK=0 \
+    if SPYRE_DEVICES=$spyre_devices AIU_WORLD_SIZE=$tp_size LOCAL_RANK=0 \
         eval "$bench_command" 2>&1; then
         if [[ -f "$RESULTS_DIR/${test_name}.json" ]]; then
             echo "│"
@@ -130,10 +141,12 @@ run_model_on_device() {
             test_name=$(echo "$params" | jq -r '.test_name')
             local bench_params
             bench_params=$(echo "$params" | jq -r '.parameters')
+            local tp_size
+            tp_size=$(echo "$bench_params" | jq -r '.tensor_parallel_size // 1')
             local bench_args
             bench_args=$(json2args "$bench_params")
 
-            if run_single_test "latency" "$test_name" "$bench_args" "$device_id"; then
+            if run_single_test "latency" "$test_name" "$bench_args" "$device_id" "$tp_size"; then
                 pass_count=$((pass_count + 1))
             else
                 fail_count=$((fail_count + 1))
@@ -148,10 +161,12 @@ run_model_on_device() {
             test_name=$(echo "$params" | jq -r '.test_name')
             local bench_params
             bench_params=$(echo "$params" | jq -r '.parameters')
+            local tp_size
+            tp_size=$(echo "$bench_params" | jq -r '.tensor_parallel_size // 1')
             local bench_args
             bench_args=$(json2args "$bench_params")
 
-            if run_single_test "throughput" "$test_name" "$bench_args" "$device_id"; then
+            if run_single_test "throughput" "$test_name" "$bench_args" "$device_id" "$tp_size"; then
                 pass_count=$((pass_count + 1))
             else
                 fail_count=$((fail_count + 1))
@@ -191,10 +206,12 @@ run_benchmark_tests() {
         test_name=$(echo "$params" | jq -r '.test_name')
         local bench_params
         bench_params=$(echo "$params" | jq -r '.parameters')
+        local tp_size
+        tp_size=$(echo "$bench_params" | jq -r '.tensor_parallel_size // 1')
         local bench_args
         bench_args=$(json2args "$bench_params")
 
-        if run_single_test "$test_type" "$test_name" "$bench_args" "0"; then
+        if run_single_test "$test_type" "$test_name" "$bench_args" "0" "$tp_size"; then
             pass_count=$((pass_count + 1))
         else
             fail_count=$((fail_count + 1))
@@ -244,18 +261,30 @@ run_serve_benchmarks() {
             fi
 
             current_model="$model"
+            local tp_size
+            tp_size=$(echo "$server_params" | jq -r '.tensor_parallel_size // 1')
+
+            # Calculate device range for serve
+            local spyre_devices="$device_id"
+            if [[ $tp_size -gt 1 ]]; then
+                local devices=()
+                for ((d=device_id; d<device_id+tp_size; d++)); do
+                    devices+=("$d")
+                done
+                spyre_devices=$(IFS=,; echo "${devices[*]}")
+            fi
 
             echo ""
-            echo "┌─ [serve] Starting vLLM server: $model (device: $device_id)"
+            echo "┌─ [serve] Starting vLLM server: $model (devices: $spyre_devices, tp: $tp_size)"
             echo "│"
 
             # Start server with device isolation
-            SPYRE_DEVICES=$device_id AIU_WORLD_SIZE=1 LOCAL_RANK=0 \
+            SPYRE_DEVICES=$spyre_devices AIU_WORLD_SIZE=$tp_size LOCAL_RANK=0 \
                 vllm serve "$model" \
                 --dtype $(echo "$server_params" | jq -r '.dtype') \
                 --max-model-len $(echo "$server_params" | jq -r '.max_model_len') \
                 --load-format $(echo "$server_params" | jq -r '.load_format') \
-                --tensor-parallel-size 1 \
+                --tensor-parallel-size "$tp_size" \
                 --port 8000 \
                 > "$RESULTS_DIR/server_${test_name}.log" 2>&1 &
             server_pid=$!
