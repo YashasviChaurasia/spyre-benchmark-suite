@@ -98,11 +98,17 @@ spec:
 
             python3 -c "import vllm; print('vLLM version:', vllm.__version__)"
 
-            # ---- Phase 3b: Install torch-spyre TP fix (multiproc device init) ----
-            echo "=== Installing torch-spyre fix/tp-multiproc-device-init ==="
-            uv pip install --no-deps --reinstall-package torch-spyre \
-              "torch-spyre @ git+https://github.com/YashasviChaurasia/torch-spyre.git@fix/tp-multiproc-device-init"
-            python3 -c "import torch_spyre; print('torch-spyre installed from fix branch')"
+            # ---- Phase 3b: Patch torch-spyre with TP multiproc device init fix ----
+            echo "=== Patching torch-spyre with fix/tp-multiproc-device-init ==="
+            TORCH_SPYRE_DIR=$(python3 -c "import torch_spyre, os; print(os.path.dirname(torch_spyre.__file__))")
+            echo "  torch-spyre location: $TORCH_SPYRE_DIR"
+            git clone --depth 1 -b fix/tp-multiproc-device-init \
+              https://github.com/YashasviChaurasia/torch-spyre.git /dev/shm/torch-spyre-fix
+            cp /dev/shm/torch-spyre-fix/torch_spyre/__init__.py "$TORCH_SPYRE_DIR/__init__.py"
+            cp /dev/shm/torch-spyre-fix/torch_spyre/device/interface.py "$TORCH_SPYRE_DIR/device/interface.py"
+            rm -rf /dev/shm/torch-spyre-fix
+            echo "  Patched: __init__.py + device/interface.py"
+            python3 -c "import torch_spyre; print('torch-spyre patched successfully')"
 
             # ---- Phase 4: Install benchmark dependencies ----
             uv pip install pyyaml 2>/dev/null || pip install pyyaml
