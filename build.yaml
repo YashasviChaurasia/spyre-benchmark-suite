@@ -16,15 +16,15 @@ spec:
       imagePullPolicy: Always
       resources:
         limits:
-          ibm.com/spyre_pf: '1'
+          ibm.com/spyre_pf: '2'
         requests:
-          ibm.com/spyre_pf: '1'
+          ibm.com/spyre_pf: '2'
       workingDir: /dev/shm
       env:
         - name: BENCHMARK_REPO
           value: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
         - name: BENCHMARK_BRANCH
-          value: main
+          value: test/tp2-multiproc-fix
         - name: SPYRE_INFERENCE_REPO
           value: https://github.com/torch-spyre/spyre-inference.git
         - name: SPYRE_INFERENCE_BRANCH
@@ -47,6 +47,16 @@ spec:
           value: 'false'
         - name: AIU_SETUP_MULTI_AIU
           value: '1'
+        - name: AIU_WORLD_SIZE
+          value: '2'
+        - name: DEEPTOOLS_PATH
+          value: /opt/ibm/spyre/deeptools/share
+        - name: LD_LIBRARY_PATH
+          value: /opt/ibm/spyre/runtime/lib:/opt/ibm/spyre/deeptools/lib:/opt/ibm/spyre/senlib/lib
+        - name: VLLM_CPU_KVCACHE_SPACE
+          value: '16'
+        - name: DTLOG_LEVEL
+          value: error
         - name: SAVE_TO_PYTORCH_BENCHMARK_FORMAT
           value: '1'
       command:
@@ -88,6 +98,12 @@ spec:
 
             python3 -c "import vllm; print('vLLM version:', vllm.__version__)"
 
+            # ---- Phase 3b: Install torch-spyre TP fix (multiproc device init) ----
+            echo "=== Installing torch-spyre fix/tp-multiproc-device-init ==="
+            uv pip install --reinstall-package torch-spyre \
+              "torch-spyre @ git+https://github.com/YashasviChaurasia/torch-spyre.git@fix/tp-multiproc-device-init"
+            python3 -c "import torch_spyre; print('torch-spyre installed from fix branch')"
+
             # ---- Phase 4: Install benchmark dependencies ----
             uv pip install pyyaml 2>/dev/null || pip install pyyaml
             which jq || (apt-get update -qq && apt-get install -y -qq jq 2>/dev/null) || true
@@ -113,6 +129,4 @@ spec:
   serviceAccount: default
   volumes:
     - name: dev-shm
-      emptyDir:
-        medium: Memory
-        sizeLimit: 64Gi
+      emptyDir: {}
