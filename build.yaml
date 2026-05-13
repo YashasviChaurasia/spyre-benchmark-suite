@@ -84,9 +84,13 @@ spec:
             uv sync --frozen --active --inexact \
               --no-build-isolation-package vllm \
               --no-build-isolation-package torch-spyre
+
+            # Editable install to register spyre-inference entry points (platform plugin)
+            uv pip install -e . --no-deps
             cd /dev/shm
 
             python3 -c "import vllm; print('vLLM version:', vllm.__version__)"
+            python3 -c "from vllm.platforms import current_platform; print('Platform:', type(current_platform).__name__)"
 
             # ---- Phase 3b: Patch torch-spyre with TP fix (lockfile pins old version) ----
             echo "=== Patching torch-spyre with fix/tp-multiproc-device-init ==="
