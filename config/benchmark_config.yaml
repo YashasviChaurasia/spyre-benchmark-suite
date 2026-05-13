@@ -10,7 +10,7 @@ engine:
   dtype: float16
   max_model_len: 3072
   max_num_seqs: 16
-  load_format: auto               # "auto" = real HF weights, "dummy" = random weights
+  load_format: dummy              # "dummy" for parallel test (low memory)
 
 # Models to benchmark
 models:
@@ -23,7 +23,6 @@ models:
 benchmarks:
   - latency
   - throughput
-  - serve
 
 # Workload definitions per benchmark type
 workloads:

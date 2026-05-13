@@ -17,10 +17,8 @@ spec:
       resources:
         limits:
           ibm.com/spyre_pf: '{{SPYRE_PF_CARDS}}'
-          memory: 128Gi
         requests:
           ibm.com/spyre_pf: '{{SPYRE_PF_CARDS}}'
-          memory: 128Gi
       workingDir: /dev/shm
       env:
         - name: BENCHMARK_REPO
