@@ -105,15 +105,8 @@ spec:
               cp /dev/shm/torch-spyre-fix/torch_spyre/device/interface.py /dev/shm/.venv/lib64/python3.12/site-packages/torch_spyre/device/interface.py
             fi
             rm -rf /dev/shm/torch-spyre-fix
-            python3 -c "
-import importlib.util, os
-spec = importlib.util.find_spec('torch_spyre')
-init_path = os.path.join(spec.submodule_search_locations[0], '__init__.py')
-content = open(init_path).read()
-has_fix = 'set_device' in content or 'LOCAL_RANK' in content
-print(f'  torch_spyre at: {spec.submodule_search_locations[0]}')
-print(f'  fix applied: {has_fix}')
-" 2>&1 || echo "  (verification skipped)"
+            # Verify patch location
+            python3 -c "import importlib.util; spec = importlib.util.find_spec('torch_spyre'); print('  torch_spyre resolved to:', spec.submodule_search_locations[0])" 2>&1 || true
             echo "  torch-spyre patch complete"
 
             # ---- Phase 4: Install benchmark dependencies ----
