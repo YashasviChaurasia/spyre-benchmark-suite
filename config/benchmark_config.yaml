@@ -16,6 +16,10 @@ engine:
 models:
   - name: ibm-ai-platform/micro-g3.3-8b-instruct-1b
     tensor_parallel_size: 1
+  - name: ibm-granite/granite-3.3-8b-instruct
+    tensor_parallel_size: 1
+  - name: ibm-granite/granite-4-8b-dense
+    tensor_parallel_size: 1
 
 # Which benchmark types to run (comment out to disable)
 benchmarks:
