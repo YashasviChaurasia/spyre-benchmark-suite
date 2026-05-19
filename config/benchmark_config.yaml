@@ -12,10 +12,10 @@ engine:
   max_num_seqs: 16
   load_format: auto               # "auto" = real HF weights, "dummy" = random weights
 
-# Models to benchmark
+# Models to benchmark (one per Spyre card for parallel execution)
 models:
   - name: ibm-ai-platform/micro-g3.3-8b-instruct-1b
-    tensor_parallel_size: 2
+    tensor_parallel_size: 1
 
 # Which benchmark types to run (comment out to disable)
 benchmarks:
@@ -52,7 +52,7 @@ deployment:
   namespace: torch-spyre-cicd
   spyre_pf_cards: 2
   benchmark_repo: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
-  benchmark_branch: main
+  benchmark_branch: test/tp1-parallel-run
   spyre_inference_repo: https://github.com/torch-spyre/spyre-inference.git
   spyre_inference_branch: main
 
