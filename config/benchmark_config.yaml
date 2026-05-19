@@ -20,6 +20,10 @@ models:
     tensor_parallel_size: 1
   - name: ibm-granite/granite-4-8b-dense
     tensor_parallel_size: 1
+  - name: ibm-granite/granite-4-8b-dense-hybrid
+    tensor_parallel_size: 1
+  - name: meta-llama/Llama-3.1-8B-Instruct
+    tensor_parallel_size: 1
 
 # Which benchmark types to run (comment out to disable)
 benchmarks:
