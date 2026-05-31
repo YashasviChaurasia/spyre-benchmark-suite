@@ -71,6 +71,8 @@ spec:
             # ---- Phase 1: Shell environment ----
             cp /home/senuser/.bashrc ~/
             cp /home/senuser/.bash_profile ~/
+            source /etc/profile.d/ibm-aiu-setup.sh || true
+            echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 
             # ---- Phase 2: Install uv and create venv ----
             curl -LsSf https://astral.sh/uv/install.sh | sh
