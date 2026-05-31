@@ -52,7 +52,7 @@ spec:
         - name: DEEPTOOLS_PATH
           value: /opt/ibm/spyre/deeptools/share
         - name: LD_LIBRARY_PATH
-          value: /opt/ibm/spyre/runtime/lib:/opt/ibm/spyre/deeptools/lib:/opt/ibm/spyre/senlib/lib
+          value: /opt/ibm/spyre/runtime/lib:/opt/ibm/spyre/deeptools/lib:/opt/ibm/spyre/senlib/lib:/opt/ibm/spyre/spyre-comms/lib
         - name: VLLM_CPU_KVCACHE_SPACE
           value: '16'
         - name: DTLOG_LEVEL
