@@ -80,7 +80,9 @@ spec:
             pip freeze
 
             # ---- Phase 3: Fix env + Install benchmark dependencies ----
-            pip uninstall torchvision -y 2>/dev/null || true
+            # Remove torchvision (incompatible with torch in this image, causes operator registration error)
+            find $HOME/torch-spyre/.venv -type d -name "torchvision" -exec rm -rf {} + 2>/dev/null || true
+            find $HOME/torch-spyre/.venv -type d -name "torchvision*.dist-info" -exec rm -rf {} + 2>/dev/null || true
             pip install pyyaml 2>/dev/null || true
             which jq || (apt-get update -qq && apt-get install -y -qq jq 2>/dev/null) || true
 
