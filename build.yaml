@@ -67,11 +67,10 @@ spec:
             set -ex
 
             # ---- Phase 1: Shell environment + activate existing venv ----
-            source $HOME/.bashrc || true
+            source /home/senuser/.bashrc || true
             source /etc/profile.d/ibm-aiu-setup.sh || true
-            cd $HOME
-            source torch-spyre/.venv/bin/activate
-            export PATH="$HOME/.local/bin:$PATH"
+            source /home/senuser/torch-spyre/.venv/bin/activate
+            export PATH="/home/senuser/.local/bin:$PATH"
 
             # ---- Phase 2: Build vLLM from source (GPU wheel missing cpu ops) ----
             echo "=== Building vLLM from source for CPU/Spyre ==="
@@ -84,7 +83,7 @@ spec:
             uv sync --frozen --active --inexact \
               --no-build-isolation-package vllm \
               --no-build-isolation-package torch-spyre
-            cd $HOME
+            cd /dev/shm
 
             python3 -c "import vllm; print('vLLM version:', vllm.__version__)"
             python3 -c "import torch; print('torch.ops._C.init_cpu_memory_env' in dir(torch.ops._C))" || true
