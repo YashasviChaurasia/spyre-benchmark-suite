@@ -80,7 +80,8 @@ spec:
             echo "=== Installing spyre-inference (vLLM + plugin) from ${SPYRE_INFERENCE_REPO} ==="
             git clone -b "${SPYRE_INFERENCE_BRANCH}" "${SPYRE_INFERENCE_REPO}" spyre-inference
             cd spyre-inference
-            uv pip install -e . --no-deps
+            # Install vLLM + spyre-inference with deps (reuses pre-built torch-spyre from base)
+            uv pip install -e . --no-build-isolation-package vllm
             cd $HOME
 
             python3 -c "import vllm; print('vLLM version:', vllm.__version__)"
