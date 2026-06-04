@@ -88,10 +88,11 @@ spec:
 
             uv pip install cmake numpy setuptools-scm wheel ninja expecttest
 
-            # Build vLLM from source (lockfile pins correct git source with CPU backend)
-            uv sync --frozen --active --inexact \
-              --no-build-isolation-package vllm \
-              --no-build-isolation-package torch-spyre
+            # Build vLLM 0.19.1 from source (0.20+ has dynamic shape compilation issues)
+            uv pip install "vllm @ git+https://github.com/vllm-project/vllm@v0.19.1" \
+              --no-build-isolation
+            # Install spyre-inference plugin (no deps — vllm already installed)
+            uv pip install -e . --no-deps
             cd /dev/shm
 
             python3 -c "import vllm; print('vLLM version:', vllm.__version__)"
