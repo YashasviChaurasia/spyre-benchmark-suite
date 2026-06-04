@@ -12,9 +12,10 @@ spec:
       type: RuntimeDefault
   containers:
     - name: app
-      # Previous image (required full vLLM build from source ~12min):
-      # image: us.icr.io/wxpe-cicd-internal/amd64/vllm-spyre-dev:dev-next
-      image: icr.io/ai_sw_accel/2.0/spyre-inference:latest
+      # Previous images:
+      # image: us.icr.io/wxpe-cicd-internal/amd64/vllm-spyre-dev:dev-next  (full build from source)
+      # image: icr.io/ai_sw_accel/2.0/spyre-inference:latest  (missing cpu_worker ops)
+      image: icr.io/ai_sw_accel/2.0/torch-spyre:latest
       imagePullPolicy: Always
       resources:
         limits:
@@ -72,17 +73,21 @@ spec:
             source /etc/profile.d/ibm-aiu-setup.sh || true
             echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 
-            # ---- Phase 2: Activate pre-installed venv ----
+            # ---- Phase 2: Activate pre-installed venv + install spyre-inference ----
             cd $HOME
             source torch-spyre/.venv/bin/activate
+
+            echo "=== Installing spyre-inference (vLLM + plugin) from ${SPYRE_INFERENCE_REPO} ==="
+            git clone -b "${SPYRE_INFERENCE_BRANCH}" "${SPYRE_INFERENCE_REPO}" spyre-inference
+            cd spyre-inference
+            uv pip install -e . --no-deps
+            cd $HOME
+
             python3 -c "import vllm; print('vLLM version:', vllm.__version__)"
             echo "=== pip freeze ==="
             pip freeze
 
-            # ---- Phase 3: Fix env + Install benchmark dependencies ----
-            # Remove torchvision (incompatible with torch in this image, causes operator registration error)
-            find $HOME/torch-spyre/.venv -type d -name "torchvision" -exec rm -rf {} + 2>/dev/null || true
-            find $HOME/torch-spyre/.venv -type d -name "torchvision*.dist-info" -exec rm -rf {} + 2>/dev/null || true
+            # ---- Phase 3: Install benchmark dependencies ----
             pip install pyyaml 2>/dev/null || true
             which jq || (apt-get update -qq && apt-get install -y -qq jq 2>/dev/null) || true
 
