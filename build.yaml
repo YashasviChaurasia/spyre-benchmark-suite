@@ -73,20 +73,15 @@ spec:
             export PATH="/home/senuser/.local/bin:$PATH"
 
             # ---- Phase 2: Install build deps + Build vLLM from source ----
-            # numa.h + libnuma required for vLLM CPU build
-            # Image has numactl runtime but not -devel (headers + symlink)
-            if [ ! -f /usr/include/numa.h ]; then
-              curl -sL https://raw.githubusercontent.com/numactl/numactl/v2.0.18/numa.h -o /tmp/numa.h
-              curl -sL https://raw.githubusercontent.com/numactl/numactl/v2.0.18/numaif.h -o /tmp/numaif.h
-              export C_INCLUDE_PATH="/tmp:${C_INCLUDE_PATH:-}"
-              export CPLUS_INCLUDE_PATH="/tmp:${CPLUS_INCLUDE_PATH:-}"
-            fi
-            # Create libnuma.so symlink for linker (runtime .so.1 exists)
-            NUMA_SO=$(find /usr/lib64 /lib64 -name "libnuma.so.*" 2>/dev/null | head -1)
-            if [ -n "$NUMA_SO" ] && [ ! -f /tmp/libnuma.so ]; then
-              ln -sf "$NUMA_SO" /tmp/libnuma.so
-              export LIBRARY_PATH="/tmp:${LIBRARY_PATH:-}"
-            fi
+            # numactl headers + lib required for vLLM CPU build (not in torch-spyre base)
+            echo "=== Building numactl for vLLM CPU linkage ==="
+            curl -sL https://github.com/numactl/numactl/releases/download/v2.0.18/numactl-2.0.18.tar.gz | tar xz -C /tmp
+            cd /tmp/numactl-2.0.18 && ./configure --prefix=/tmp/numactl && make -j$(nproc) && make install
+            cd /dev/shm
+            export C_INCLUDE_PATH="/tmp/numactl/include:${C_INCLUDE_PATH:-}"
+            export CPLUS_INCLUDE_PATH="/tmp/numactl/include:${CPLUS_INCLUDE_PATH:-}"
+            export LIBRARY_PATH="/tmp/numactl/lib:${LIBRARY_PATH:-}"
+            export LD_LIBRARY_PATH="/tmp/numactl/lib:${LD_LIBRARY_PATH:-}"
             echo "=== Building vLLM from source for CPU/Spyre ==="
             git clone -b "${SPYRE_INFERENCE_BRANCH}" "${SPYRE_INFERENCE_REPO}" spyre-inference
             cd spyre-inference
