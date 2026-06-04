@@ -87,18 +87,16 @@ spec:
             git clone -b "${SPYRE_INFERENCE_BRANCH}" "${SPYRE_INFERENCE_REPO}" spyre-inference
             cd spyre-inference
 
+            # Uninstall pre-installed GPU vLLM (missing CPU ops)
+            pip uninstall vllm torchvision -y 2>/dev/null || true
+
             uv pip install cmake numpy setuptools-scm wheel ninja expecttest
 
-            # Build vLLM 0.19.1 from source (0.20+ has dynamic shape compilation issues)
-            uv pip install "vllm @ git+https://github.com/vllm-project/vllm@v0.19.1" \
-              --no-build-isolation
-            # Install spyre-inference plugin (no deps — vllm already installed)
-            uv pip install -e . --no-deps
+            # Build vLLM from source via lockfile (ensures CPU ops are compiled)
+            uv sync --frozen --active --inexact \
+              --no-build-isolation-package vllm \
+              --no-build-isolation-package torch-spyre
             cd /dev/shm
-
-            # Remove torchvision AFTER install (vLLM pulls it but it's incompatible with base torch)
-            pip uninstall torchvision -y 2>/dev/null || true
-            rm -rf /home/senuser/torch-spyre/.venv/lib*/python3.12/site-packages/torchvision* 2>/dev/null || true
 
             python3 -c "import vllm; print('vLLM version:', vllm.__version__)"
             python3 -c "import torch; print('torch.ops._C.init_cpu_memory_env' in dir(torch.ops._C))" || true
