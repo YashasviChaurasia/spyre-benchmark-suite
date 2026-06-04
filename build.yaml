@@ -79,7 +79,8 @@ spec:
             echo "=== pip freeze ==="
             pip freeze
 
-            # ---- Phase 3: Install benchmark dependencies ----
+            # ---- Phase 3: Fix env + Install benchmark dependencies ----
+            pip uninstall torchvision -y 2>/dev/null || true
             pip install pyyaml 2>/dev/null || true
             which jq || (apt-get update -qq && apt-get install -y -qq jq 2>/dev/null) || true
 
