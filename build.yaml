@@ -73,13 +73,19 @@ spec:
             export PATH="/home/senuser/.local/bin:$PATH"
 
             # ---- Phase 2: Install build deps + Build vLLM from source ----
-            # numa.h required for vLLM CPU build (image has numactl but not -devel headers)
-            # Download header directly if we can't install via package manager
+            # numa.h + libnuma required for vLLM CPU build
+            # Image has numactl runtime but not -devel (headers + symlink)
             if [ ! -f /usr/include/numa.h ]; then
               curl -sL https://raw.githubusercontent.com/numactl/numactl/v2.0.18/numa.h -o /tmp/numa.h
               curl -sL https://raw.githubusercontent.com/numactl/numactl/v2.0.18/numaif.h -o /tmp/numaif.h
               export C_INCLUDE_PATH="/tmp:${C_INCLUDE_PATH:-}"
               export CPLUS_INCLUDE_PATH="/tmp:${CPLUS_INCLUDE_PATH:-}"
+            fi
+            # Create libnuma.so symlink for linker (runtime .so.1 exists)
+            NUMA_SO=$(find /usr/lib64 /lib64 -name "libnuma.so.*" 2>/dev/null | head -1)
+            if [ -n "$NUMA_SO" ] && [ ! -f /tmp/libnuma.so ]; then
+              ln -sf "$NUMA_SO" /tmp/libnuma.so
+              export LIBRARY_PATH="/tmp:${LIBRARY_PATH:-}"
             fi
             echo "=== Building vLLM from source for CPU/Spyre ==="
             git clone -b "${SPYRE_INFERENCE_BRANCH}" "${SPYRE_INFERENCE_REPO}" spyre-inference
