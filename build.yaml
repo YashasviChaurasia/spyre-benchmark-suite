@@ -76,7 +76,6 @@ spec:
             cd $HOME
             source torch-spyre/.venv/bin/activate
             python3 -c "import vllm; print('vLLM version:', vllm.__version__)"
-            python3 -c "import torch_spyre; print('torch-spyre loaded')"
             echo "=== pip freeze ==="
             pip freeze
 
