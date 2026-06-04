@@ -72,6 +72,9 @@ spec:
             source /home/senuser/torch-spyre/.venv/bin/activate
             export PATH="/home/senuser/.local/bin:$PATH"
 
+            # Remove torchvision (incompatible with torch in base image)
+            find /home/senuser/torch-spyre/.venv -type d -name "torchvision*" -exec rm -rf {} + 2>/dev/null || true
+
             # ---- Phase 2: Install build deps + Build vLLM from source ----
             # numactl headers + lib required for vLLM CPU build (not in torch-spyre base)
             echo "=== Building numactl for vLLM CPU linkage ==="
