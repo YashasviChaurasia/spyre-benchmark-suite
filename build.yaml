@@ -27,9 +27,9 @@ spec:
         - name: BENCHMARK_BRANCH
           value: test/tp1-parallel-run
         - name: SPYRE_INFERENCE_REPO
-          value: https://github.com/torch-spyre/spyre-inference.git
+          value: https://github.com/YashasviChaurasia/spyre-inference.git
         - name: SPYRE_INFERENCE_BRANCH
-          value: main
+          value: fix/remove-torchvision-dep
         - name: HF_TOKEN
           valueFrom:
             secretKeyRef:
