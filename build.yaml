@@ -12,9 +12,7 @@ spec:
       type: RuntimeDefault
   containers:
     - name: app
-      # Previous images:
-      # image: us.icr.io/wxpe-cicd-internal/amd64/vllm-spyre-dev:dev-next  (full build from source)
-      # image: icr.io/ai_sw_accel/2.0/spyre-inference:latest  (missing cpu_worker ops)
+      # torch-spyre base + build vLLM from source (replicates Dockerfile fix)
       image: icr.io/ai_sw_accel/2.0/torch-spyre:latest
       imagePullPolicy: Always
       resources:
@@ -22,7 +20,7 @@ spec:
           ibm.com/spyre_pf: '2'
         requests:
           ibm.com/spyre_pf: '2'
-      workingDir: /home/senuser
+      workingDir: /dev/shm
       env:
         - name: BENCHMARK_REPO
           value: https://github.com/YashasviChaurasia/spyre-benchmark-suite.git
@@ -39,9 +37,9 @@ spec:
               key: token
               optional: true
         - name: HOME
-          value: /home/senuser
+          value: /dev/shm
         - name: HF_HOME
-          value: /home/senuser
+          value: /dev/shm
         - name: FLEX_COMPUTE
           value: SENTIENT
         - name: FLEX_DEVICE
@@ -68,28 +66,31 @@ spec:
         - |
             set -ex
 
-            # ---- Phase 1: Shell environment ----
+            # ---- Phase 1: Shell environment + activate existing venv ----
             source $HOME/.bashrc || true
             source /etc/profile.d/ibm-aiu-setup.sh || true
-            echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
-
-            # ---- Phase 2: Activate pre-installed venv + install spyre-inference ----
             cd $HOME
             source torch-spyre/.venv/bin/activate
+            export PATH="$HOME/.local/bin:$PATH"
 
-            echo "=== Installing spyre-inference (vLLM + plugin) from ${SPYRE_INFERENCE_REPO} ==="
+            # ---- Phase 2: Build vLLM from source (GPU wheel missing cpu ops) ----
+            echo "=== Building vLLM from source for CPU/Spyre ==="
             git clone -b "${SPYRE_INFERENCE_BRANCH}" "${SPYRE_INFERENCE_REPO}" spyre-inference
             cd spyre-inference
-            # Install vLLM + spyre-inference with deps (reuses pre-built torch-spyre from base)
-            uv pip install -e . --no-build-isolation-package vllm
+
+            uv pip install cmake numpy setuptools-scm wheel ninja expecttest
+
+            # Build vLLM from source (lockfile pins correct git source with CPU backend)
+            uv sync --frozen --active --inexact \
+              --no-build-isolation-package vllm \
+              --no-build-isolation-package torch-spyre
             cd $HOME
 
             python3 -c "import vllm; print('vLLM version:', vllm.__version__)"
-            echo "=== pip freeze ==="
-            pip freeze
+            python3 -c "import torch; print('torch.ops._C.init_cpu_memory_env' in dir(torch.ops._C))" || true
 
             # ---- Phase 3: Install benchmark dependencies ----
-            pip install pyyaml 2>/dev/null || true
+            uv pip install pyyaml 2>/dev/null || pip install pyyaml
             which jq || (apt-get update -qq && apt-get install -y -qq jq 2>/dev/null) || true
 
             # ---- Phase 4: Clone benchmark suite ----
@@ -110,7 +111,6 @@ spec:
   restartPolicy: Never
   imagePullSecrets:
     - name: ai-sw-accel-pull-secret
-    # Previous: wxpe-cicd-vllm-iccr-internal (for vllm-spyre-dev image)
   serviceAccount: default
   volumes:
     - name: dev-shm
