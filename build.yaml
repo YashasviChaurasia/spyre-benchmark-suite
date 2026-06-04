@@ -72,10 +72,6 @@ spec:
             source /home/senuser/torch-spyre/.venv/bin/activate
             export PATH="/home/senuser/.local/bin:$PATH"
 
-            # Remove torchvision (incompatible with torch in base image)
-            pip uninstall torchvision -y 2>/dev/null || true
-            rm -rf /home/senuser/torch-spyre/.venv/lib/python3.12/site-packages/torchvision* 2>/dev/null || true
-            rm -rf /home/senuser/torch-spyre/.venv/lib64/python3.12/site-packages/torchvision* 2>/dev/null || true
 
             # ---- Phase 2: Install build deps + Build vLLM from source ----
             # numactl headers + lib required for vLLM CPU build (not in torch-spyre base)
@@ -99,6 +95,10 @@ spec:
             # Install spyre-inference plugin (no deps — vllm already installed)
             uv pip install -e . --no-deps
             cd /dev/shm
+
+            # Remove torchvision AFTER install (vLLM pulls it but it's incompatible with base torch)
+            pip uninstall torchvision -y 2>/dev/null || true
+            rm -rf /home/senuser/torch-spyre/.venv/lib*/python3.12/site-packages/torchvision* 2>/dev/null || true
 
             python3 -c "import vllm; print('vLLM version:', vllm.__version__)"
             python3 -c "import torch; print('torch.ops._C.init_cpu_memory_env' in dir(torch.ops._C))" || true
